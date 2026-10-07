@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="com.vermeg.demo.PaymentServiceTests" tests="3" failures="1" errors="0" skipped="0" time="1.200">
+    <testcase name="shouldProcessPayment" classname="com.vermeg.demo.PaymentServiceTests" time="0.12"/>
+    <testcase name="shouldRejectInvalidIban" classname="com.vermeg.demo.PaymentServiceTests" time="0.12"/>
+    <testcase name="shouldConnectToPaymentGateway" classname="com.vermeg.demo.PaymentServiceTests" time="0.31"><failure message="Connection timeout while reaching payment gateway after 30000ms" type="org.opentest4j.AssertionFailedError">Connection timeout while reaching payment gateway after 30000ms
+	at com.vermeg.demo.PaymentServiceTests.shouldConnectToPaymentGateway(PaymentServiceTests.java:42)</failure></testcase>
+  </testsuite>
+  <testsuite name="com.vermeg.demo.ReportGeneratorTests" tests="2" failures="1" errors="0" skipped="0" time="0.800">
+    <testcase name="shouldBuildCorepReport" classname="com.vermeg.demo.ReportGeneratorTests" time="0.31"><failure message="NullPointerException: exposure is null" type="org.opentest4j.AssertionFailedError">NullPointerException: exposure is null
+	at com.vermeg.demo.ReportGeneratorTests.shouldBuildCorepReport(ReportGeneratorTests.java:42)</failure></testcase>
+    <testcase name="shouldExportXbrl" classname="com.vermeg.demo.ReportGeneratorTests" time="0.12"/>
+  </testsuite>
+  <testsuite name="com.vermeg.demo.AuthServiceTests" tests="3" failures="0" errors="0" skipped="0" time="1.200">
+    <testcase name="shouldIssueJwt" classname="com.vermeg.demo.AuthServiceTests" time="0.12"/>
+    <testcase name="shouldRejectExpiredToken" classname="com.vermeg.demo.AuthServiceTests" time="0.12"/>
+    <testcase name="shouldValidateTokenSignature" classname="com.vermeg.demo.AuthServiceTests" time="0.12"/>
+  </testsuite>
+</testsuites>

@@ -1,0 +1,12 @@
+2026-10-02 10:00:01 INFO [payment-service] Payment request received for order 48213
+2026-10-02 10:00:31 ERROR [payment-service] Connection timeout while reaching payment gateway after 30000ms for order 48213
+2026-10-02 10:01:02 ERROR [payment-service] Connection timeout while reaching payment gateway after 30000ms for order 48219
+2026-10-02 10:01:40 WARN [payment-service] Retrying payment gateway call (attempt 2) for order 48219
+2026-10-02 10:02:11 ERROR [payment-service] Connection timeout while reaching payment gateway after 30000ms for order 48230
+2026-10-02 10:02:45 ERROR [payment-service] Connection timeout while reaching payment gateway after 30000ms for order 48244
+2026-10-02 10:03:05 ERROR [report-service] NullPointerException: exposure is null while building COREP report 2026-Q3
+java.lang.NullPointerException: exposure is null
+	at com.vermeg.demo.ReportGenerator.buildCorep(ReportGenerator.java:118)
+	at com.vermeg.demo.ReportController.generate(ReportController.java:42)
+2026-10-02 10:03:30 FATAL [payment-service] Circuit breaker OPEN: payment gateway unreachable, service degraded
+2026-10-02 10:04:00 INFO [auth-service] Token issued for user 1042

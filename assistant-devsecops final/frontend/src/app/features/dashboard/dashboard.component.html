@@ -1,0 +1,173 @@
+<div class="page-header">
+  <div>
+    <p class="eyebrow">Vue d'ensemble</p>
+    <h1>Tableau de bord DevSecOps</h1>
+  </div>
+  <div class="actions">
+    <button class="btn" type="button" (click)="load()">Actualiser</button>
+    <button class="btn btn--primary" type="button" (click)="downloadReport()">Exporter le rapport</button>
+  </div>
+</div>
+
+<details class="help">
+  <summary>Comment lire ce tableau de bord ?</summary>
+  <div class="help__body">
+    <p>Cet écran résume l'état du projet à partir des trois sources d'information : logs, tests et vulnérabilités.
+      Il se met à jour tout seul à chaque événement (nouveau scan, nouveaux logs, fin de tests). Cliquez sur une carte
+      pour ouvrir l'écran correspondant.</p>
+    <p><strong>Score de santé (0 à 100)</strong> : on part de 100 et on retire des points — 15 par vulnérabilité critique
+      ouverte et 4 par vulnérabilité haute (40 max), 0,8 point par % de tests en échec (25 max), 5 par anomalie de logs
+      critique (20 max), 2 par pic d'erreurs (10 max). 80 et plus : bon · 60 à 79 : à surveiller · 40 à 59 : dégradé ·
+      moins de 40 : critique.</p>
+    <p><strong>Quality gate</strong> : la décision « on peut livrer / on ne peut pas » que le pipeline CI/CD interroge.
+      Elle est franchie seulement si les cinq conditions du tableau sont toutes OK.</p>
+    <p><strong>Par où commencer ?</strong> Traitez d'abord les lignes KO de la quality gate, puis les listes
+      « Anomalies prioritaires » et « Vulnérabilités à traiter en premier » de haut en bas.</p>
+  </div>
+</details>
+
+@if (error()) {
+  <div class="alert alert--error">{{ error() }}</div>
+}
+
+@if (data(); as d) {
+  <section class="grid grid--hero">
+    <div class="panel health health--{{ healthClass() }}">
+      <p class="eyebrow">Score de santé</p>
+      <div class="health__score">{{ d.healthScore }}<small>/100</small></div>
+      <p class="health__label">{{ d.healthLabel }}</p>
+      <div class="gate gate--{{ d.qualityGate.status === 'PASSED' ? 'ok' : 'ko' }}">
+        Quality gate : <strong>{{ d.qualityGate.status === 'PASSED' ? 'FRANCHI' : 'ÉCHEC' }}</strong>
+      </div>
+    </div>
+
+    <a class="panel kpi" routerLink="/logs" [class.panel--critical]="d.logs.criticalAnomalies > 0">
+      <p class="eyebrow">Logs</p>
+      <div class="kpi__value">{{ d.logs.criticalAnomalies }}</div>
+      <p class="kpi__label">anomalies critiques</p>
+      <p class="muted">{{ d.logs.total }} logs · {{ d.logs.errors }} erreurs · {{ d.logs.spikes }} pic(s)</p>
+    </a>
+
+    <a class="panel kpi" routerLink="/tests" [class.panel--high]="d.tests.failed > 0">
+      <p class="eyebrow">Tests</p>
+      <div class="kpi__value">{{ d.tests.successRate }}<small>%</small></div>
+      <p class="kpi__label">de réussite</p>
+      <p class="muted">{{ d.tests.failed }} échec(s) / {{ d.tests.total }} · couverture {{ d.tests.lineCoverage ?? '—' }}% · {{ d.tests.flaky }} instable(s)</p>
+    </a>
+
+    <a class="panel kpi" routerLink="/security" [class.panel--critical]="(d.security.openBySeverity['CRITICAL'] ?? 0) > 0">
+      <p class="eyebrow">Sécurité</p>
+      <div class="kpi__value">{{ d.security.open }}</div>
+      <p class="kpi__label">vulnérabilités ouvertes</p>
+      <p class="muted">{{ d.security.openBySeverity['CRITICAL'] ?? 0 }} critique(s) · {{ d.security.fixed }} corrigée(s)
+        @if (d.security.meanTimeToFixDays !== null) { · MTTR {{ d.security.meanTimeToFixDays }} j }</p>
+    </a>
+
+    <a class="panel kpi" routerLink="/ai" [class.panel--medium]="d.ai.pending > 0">
+      <p class="eyebrow">Assistant IA</p>
+      <div class="kpi__value">{{ d.ai.pending }}</div>
+      <p class="kpi__label">recommandation(s) à valider</p>
+      <p class="muted">{{ d.ai.approved }} validée(s) · {{ d.ai.rejected }} rejetée(s)</p>
+    </a>
+  </section>
+
+  <section class="grid grid--2">
+    <div class="panel">
+      <h2>Quality gate</h2>
+      <table class="table">
+        <thead><tr><th>Condition</th><th>Valeur</th><th>Seuil</th><th></th></tr></thead>
+        <tbody>
+          @for (c of d.qualityGate.conditions; track c.name) {
+            <tr>
+              <td>{{ c.name }}</td><td class="mono">{{ c.actual }}</td><td class="mono muted">{{ c.threshold }}</td>
+              <td><span class="badge badge--{{ c.passed ? 'ok' : 'critical' }}">{{ c.passed ? 'OK' : 'KO' }}</span></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <h2>Vulnérabilités ouvertes par sévérité</h2>
+      @if (severitySlices().length) {
+        <app-donut-chart [slices]="severitySlices()" caption="ouvertes" />
+      } @else {
+        <p class="empty">Aucune vulnérabilité ouverte 🎉</p>
+      }
+    </div>
+  </section>
+
+  <section class="grid grid--2">
+    <div class="panel">
+      <h2>Tendance des tests</h2>
+      @if (d.tests.trend.length > 1) {
+        <app-line-chart [series]="testTrend()" [labels]="trendLabels()" />
+      } @else {
+        <p class="empty">Pas encore assez d'exécutions pour afficher une tendance.</p>
+      }
+    </div>
+
+    <div class="panel">
+      <h2>Services</h2>
+      <ul class="services">
+        @for (s of serviceList(); track s.name) {
+          <li>
+            <span class="status-dot status-dot--{{ s.status === 'UP' ? 'up' : s.status === 'DISABLED' ? 'off' : 'down' }}"></span>
+            <strong>{{ s.name }}</strong>
+            <span class="muted">{{ s.status }}{{ s.provider ? ' · ' + s.provider : '' }}{{ s.model ? ' (' + s.model + ')' : '' }}</span>
+          </li>
+        }
+      </ul>
+      <h3>Derniers traitements</h3>
+      <ul class="jobs">
+        @for (j of d.recentJobs; track j.id) {
+          <li>
+            <span class="badge badge--{{ j.status === 'SUCCEEDED' ? 'ok' : j.status === 'FAILED' ? 'critical' : 'medium' }}">{{ j.status | lbl }}</span>
+            {{ j.label }} <span class="muted">· {{ j.startedAt | relative }}{{ j.triggeredBy ? ' · par ' + j.triggeredBy : '' }}</span>
+            @if (j.message) { <div class="muted job__message" [title]="j.message">{{ j.message }}</div> }
+          </li>
+        } @empty {
+          <li class="muted">Aucun traitement lancé depuis le démarrage.</li>
+        }
+      </ul>
+    </div>
+  </section>
+
+  <section class="grid grid--2">
+    <div class="panel">
+      <div class="panel__header"><h2>Anomalies prioritaires</h2><a routerLink="/logs">Tout voir →</a></div>
+      @for (a of d.topAnomalies; track a.key) {
+        <div class="list-item list-item--{{ a.critical ? 'critical' : (a.level | sev) }}">
+          <div class="list-item__main">
+            <span class="mono">{{ a.normalizedMessage }}</span>
+            <span class="muted">{{ a.occurrences }}× · {{ a.affectedSources.join(', ') }} · {{ a.category | lbl: 'category' }}</span>
+          </div>
+          <button class="btn btn--sm" type="button" (click)="explainAnomaly(a)">Expliquer</button>
+        </div>
+      } @empty {
+        <p class="empty">Aucune anomalie détectée.</p>
+      }
+    </div>
+
+    <div class="panel">
+      <div class="panel__header"><h2>Vulnérabilités à traiter en premier</h2><a routerLink="/security">Tout voir →</a></div>
+      @for (v of d.topVulnerabilities; track v.recordId) {
+        <div class="list-item list-item--{{ v.severity | sev }}">
+          <div class="list-item__main">
+            <span><strong>{{ v.id }}</strong> <span class="badge badge--{{ v.severity | sev }}">{{ v.severity }}</span></span>
+            <span class="muted">{{ v.affectedComponent }}{{ v.fixedVersion ? ' → ' + v.fixedVersion : '' }}</span>
+          </div>
+          <span class="priority" title="Score de priorité">{{ v.priorityScore }}</span>
+        </div>
+      } @empty {
+        <p class="empty">Aucune vulnérabilité ouverte.</p>
+      }
+    </div>
+  </section>
+} @else if (!error()) {
+  <div class="loading"><span class="spinner"></span> Chargement du tableau de bord…</div>
+}
+
+@if (explain(); as req) {
+  <app-explain-dialog [request]="req" (closed)="explain.set(null)" />
+}

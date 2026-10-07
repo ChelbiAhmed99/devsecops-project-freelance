@@ -1,0 +1,73 @@
+{
+ "reportSchema": "1.1",
+ "dependencies": [
+  {
+   "fileName": "jackson-databind-2.13.2.jar",
+   "vulnerabilities": [
+    {
+     "name": "CVE-2022-42003",
+     "description": "In FasterXML jackson-databind before 2.14.0-rc1, resource exhaustion can occur because of a lack of a check in primitive value deserializers to avoid deep wrapper array nesting, when the UNWRAP_SINGLE_VALUE_ARRAYS feature is enabled.",
+     "cvssv3": {
+      "baseScore": 7.5,
+      "baseSeverity": "HIGH"
+     }
+    },
+    {
+     "name": "CVE-2020-36518",
+     "description": "jackson-databind before 2.13.0 allows a Java StackOverflow exception and denial of service via a large depth of nested objects.",
+     "cvssv3": {
+      "baseScore": 7.5,
+      "baseSeverity": "HIGH"
+     }
+    }
+   ]
+  },
+  {
+   "fileName": "snakeyaml-1.30.jar",
+   "vulnerabilities": [
+    {
+     "name": "CVE-2022-1471",
+     "description": "SnakeYaml's Constructor() class does not restrict types which can be instantiated during deserialization, leading to remote code execution.",
+     "cvssv3": {
+      "baseScore": 8.3,
+      "baseSeverity": "HIGH"
+     }
+    }
+   ]
+  },
+  {
+   "fileName": "guava-30.1-jre.jar",
+   "vulnerabilities": [
+    {
+     "name": "CVE-2023-2976",
+     "description": "Use of Java's default temporary directory for file creation in FileBackedOutputStream allows other users to access or modify the content.",
+     "cvssv3": {
+      "baseScore": 7.1,
+      "baseSeverity": "HIGH"
+     }
+    },
+    {
+     "name": "CVE-2020-8908",
+     "description": "A temp directory creation vulnerability exists in Guava versions prior to 32.0.0.",
+     "cvssv2": {
+      "score": 2.1,
+      "severity": "LOW"
+     }
+    }
+   ]
+  },
+  {
+   "fileName": "spring-web-5.3.18.jar",
+   "vulnerabilities": [
+    {
+     "name": "CVE-2024-22243",
+     "description": "Applications that use UriComponentsBuilder to parse an externally provided URL and perform validation checks on the host may be vulnerable to open redirect or SSRF.",
+     "cvssv3": {
+      "baseScore": 6.1,
+      "baseSeverity": "MEDIUM"
+     }
+    }
+   ]
+  }
+ ]
+}

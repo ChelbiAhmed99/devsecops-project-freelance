@@ -1,0 +1,118 @@
+2026-09-18 09:15:20 INFO [order-service] Request processed in 121ms
+2026-09-18 09:15:20 WARN [order-service] Retry attempt 3 calling inventory-service
+2026-09-18 09:15:20 ERROR [gateway] Upstream inventory-service responded 503 for GET /api/stock/149
+2026-09-18 09:18:04 INFO [gateway] Request processed in 44ms
+2026-09-18 09:21:23 INFO [gateway] Request processed in 34ms
+2026-09-18 09:24:32 INFO [order-service] Request processed in 29ms
+2026-09-18 09:24:32 WARN [order-service] Retry attempt 1 calling inventory-service
+2026-09-18 09:27:27 INFO [reporting-service] Request processed in 37ms
+2026-09-18 09:30:15 INFO [payment-service] Request processed in 161ms
+2026-09-18 09:30:15 ERROR [gateway] Upstream inventory-service responded 503 for GET /api/stock/534
+2026-09-18 09:33:03 INFO [gateway] Request processed in 51ms
+2026-09-18 09:33:03 WARN [order-service] Retry attempt 1 calling inventory-service
+2026-09-18 09:36:40 INFO [gateway] Request processed in 35ms
+2026-09-18 09:39:36 INFO [gateway] Request processed in 121ms
+2026-09-18 09:42:03 INFO [order-service] Request processed in 31ms
+2026-09-18 09:42:03 WARN [order-service] Retry attempt 3 calling inventory-service
+2026-09-18 09:45:00 ERROR [auth-service] JWT signature does not match locally computed signature for client 10.12.4.20
+2026-09-18 09:45:08 INFO [auth-service] Request processed in 127ms
+2026-09-18 09:45:08 ERROR [gateway] Upstream inventory-service responded 503 for GET /api/stock/247
+2026-09-18 09:48:34 INFO [payment-service] Request processed in 166ms
+2026-09-18 09:51:19 INFO [gateway] Request processed in 66ms
+2026-09-18 09:51:19 WARN [order-service] Retry attempt 1 calling inventory-service
+2026-09-18 09:54:37 INFO [gateway] Request processed in 68ms
+2026-09-18 09:56:00 ERROR [auth-service] JWT signature does not match locally computed signature for client 10.12.4.21
+2026-09-18 09:57:23 INFO [payment-service] Request processed in 160ms
+2026-09-18 10:00:45 INFO [payment-service] Request processed in 164ms
+2026-09-18 10:00:45 WARN [order-service] Retry attempt 1 calling inventory-service
+2026-09-18 10:00:45 ERROR [gateway] Upstream inventory-service responded 503 for GET /api/stock/733
+2026-09-18 10:03:13 INFO [reporting-service] Request processed in 156ms
+2026-09-18 10:05:00 ERROR [reporting-service] Failed to generate regulatory report COREP-202609
+java.lang.NullPointerException: Cannot invoke "java.math.BigDecimal.add(java.math.BigDecimal)" because "exposure" is null
+	at com.vermeg.reporting.CorepAggregator.sumExposures(CorepAggregator.java:212)
+	at com.vermeg.reporting.ReportGenerator.build(ReportGenerator.java:128)
+2026-09-18 10:06:27 INFO [auth-service] Request processed in 139ms
+2026-09-18 10:07:00 ERROR [auth-service] JWT signature does not match locally computed signature for client 10.12.4.22
+2026-09-18 10:09:37 INFO [reporting-service] Request processed in 112ms
+2026-09-18 10:09:37 WARN [order-service] Retry attempt 2 calling inventory-service
+2026-09-18 10:12:15 INFO [order-service] Request processed in 82ms
+2026-09-18 10:15:05 INFO [gateway] Request processed in 96ms
+2026-09-18 10:15:05 ERROR [gateway] Upstream inventory-service responded 503 for GET /api/stock/637
+2026-09-18 10:18:00 ERROR [auth-service] JWT signature does not match locally computed signature for client 10.12.4.23
+2026-09-18 10:18:31 INFO [auth-service] Request processed in 134ms
+2026-09-18 10:18:31 WARN [order-service] Retry attempt 2 calling inventory-service
+2026-09-18 10:21:38 INFO [payment-service] Request processed in 50ms
+2026-09-18 10:22:00 ERROR [reporting-service] Failed to generate regulatory report COREP-202610
+java.lang.NullPointerException: Cannot invoke "java.math.BigDecimal.add(java.math.BigDecimal)" because "exposure" is null
+	at com.vermeg.reporting.CorepAggregator.sumExposures(CorepAggregator.java:212)
+	at com.vermeg.reporting.ReportGenerator.build(ReportGenerator.java:128)
+2026-09-18 10:24:32 INFO [reporting-service] Request processed in 62ms
+2026-09-18 10:25:00 ERROR [payment-service] HikariPool-1 - Connection is not available, request timed out after 30000ms
+2026-09-18 10:25:00 ERROR [payment-service] Could not open JPA EntityManager for transaction
+org.springframework.transaction.CannotCreateTransactionException: Could not open JPA EntityManager for transaction
+	at org.springframework.orm.jpa.JpaTransactionManager.doBegin(JpaTransactionManager.java:466)
+Caused by: java.sql.SQLTransientConnectionException: HikariPool-1 - Connection is not available
+	... 57 more
+2026-09-18 10:25:13 ERROR [payment-service] HikariPool-1 - Connection is not available, request timed out after 30000ms
+2026-09-18 10:25:26 ERROR [payment-service] HikariPool-1 - Connection is not available, request timed out after 30000ms
+2026-09-18 10:25:39 ERROR [payment-service] HikariPool-1 - Connection is not available, request timed out after 30000ms
+2026-09-18 10:25:52 ERROR [payment-service] HikariPool-1 - Connection is not available, request timed out after 30000ms
+2026-09-18 10:26:05 ERROR [payment-service] HikariPool-1 - Connection is not available, request timed out after 30000ms
+2026-09-18 10:26:18 ERROR [payment-service] HikariPool-1 - Connection is not available, request timed out after 30000ms
+2026-09-18 10:26:18 ERROR [payment-service] Could not open JPA EntityManager for transaction
+org.springframework.transaction.CannotCreateTransactionException: Could not open JPA EntityManager for transaction
+	at org.springframework.orm.jpa.JpaTransactionManager.doBegin(JpaTransactionManager.java:466)
+Caused by: java.sql.SQLTransientConnectionException: HikariPool-1 - Connection is not available
+	... 57 more
+2026-09-18 10:26:31 ERROR [payment-service] HikariPool-1 - Connection is not available, request timed out after 30000ms
+2026-09-18 10:26:44 ERROR [payment-service] HikariPool-1 - Connection is not available, request timed out after 30000ms
+2026-09-18 10:26:57 ERROR [payment-service] HikariPool-1 - Connection is not available, request timed out after 30000ms
+2026-09-18 10:27:00 WARN [payment-service] Connection pool usage at 95%
+2026-09-18 10:27:10 ERROR [payment-service] HikariPool-1 - Connection is not available, request timed out after 30000ms
+2026-09-18 10:27:20 WARN [payment-service] Connection pool usage at 96%
+2026-09-18 10:27:23 ERROR [payment-service] HikariPool-1 - Connection is not available, request timed out after 30000ms
+2026-09-18 10:27:36 ERROR [payment-service] HikariPool-1 - Connection is not available, request timed out after 30000ms
+2026-09-18 10:27:36 ERROR [payment-service] Could not open JPA EntityManager for transaction
+org.springframework.transaction.CannotCreateTransactionException: Could not open JPA EntityManager for transaction
+	at org.springframework.orm.jpa.JpaTransactionManager.doBegin(JpaTransactionManager.java:466)
+Caused by: java.sql.SQLTransientConnectionException: HikariPool-1 - Connection is not available
+	... 57 more
+2026-09-18 10:27:40 WARN [payment-service] Connection pool usage at 97%
+2026-09-18 10:27:48 INFO [auth-service] Request processed in 58ms
+2026-09-18 10:27:48 WARN [order-service] Retry attempt 2 calling inventory-service
+2026-09-18 10:27:49 ERROR [payment-service] HikariPool-1 - Connection is not available, request timed out after 30000ms
+2026-09-18 10:28:00 WARN [payment-service] Connection pool usage at 98%
+2026-09-18 10:28:02 ERROR [payment-service] HikariPool-1 - Connection is not available, request timed out after 30000ms
+2026-09-18 10:28:15 ERROR [payment-service] HikariPool-1 - Connection is not available, request timed out after 30000ms
+2026-09-18 10:28:28 ERROR [payment-service] HikariPool-1 - Connection is not available, request timed out after 30000ms
+2026-09-18 10:28:41 ERROR [payment-service] HikariPool-1 - Connection is not available, request timed out after 30000ms
+2026-09-18 10:29:00 ERROR [auth-service] JWT signature does not match locally computed signature for client 10.12.4.24
+2026-09-18 10:30:26 INFO [payment-service] Request processed in 39ms
+2026-09-18 10:30:26 ERROR [gateway] Upstream inventory-service responded 503 for GET /api/stock/882
+2026-09-18 10:33:35 INFO [gateway] Request processed in 100ms
+2026-09-18 10:36:21 INFO [auth-service] Request processed in 172ms
+2026-09-18 10:36:21 WARN [order-service] Retry attempt 2 calling inventory-service
+2026-09-18 10:39:00 ERROR [reporting-service] Failed to generate regulatory report COREP-202611
+java.lang.NullPointerException: Cannot invoke "java.math.BigDecimal.add(java.math.BigDecimal)" because "exposure" is null
+	at com.vermeg.reporting.CorepAggregator.sumExposures(CorepAggregator.java:212)
+	at com.vermeg.reporting.ReportGenerator.build(ReportGenerator.java:128)
+2026-09-18 10:39:37 INFO [reporting-service] Request processed in 37ms
+2026-09-18 10:42:05 INFO [auth-service] Request processed in 141ms
+2026-09-18 10:45:44 INFO [payment-service] Request processed in 35ms
+2026-09-18 10:45:44 WARN [order-service] Retry attempt 3 calling inventory-service
+2026-09-18 10:45:44 ERROR [gateway] Upstream inventory-service responded 503 for GET /api/stock/818
+2026-09-18 10:48:19 INFO [gateway] Request processed in 134ms
+2026-09-18T10:50:00.123+02:00 ERROR 2231 --- [collateral-service] [scheduling-1] c.v.c.MarginCallJob : Margin call computation failed: OutOfMemoryError: Java heap space
+{"@timestamp": "2026-09-18T10:51:00.000+02:00", "level": "FATAL", "service": "collateral-service", "message": "Application shutting down after OutOfMemoryError"}
+2026-09-18 10:51:18 INFO [reporting-service] Request processed in 108ms
+2026-09-18 10:54:01 INFO [reporting-service] Request processed in 110ms
+2026-09-18 10:54:01 WARN [order-service] Retry attempt 1 calling inventory-service
+2026-09-18 10:57:39 INFO [payment-service] Request processed in 146ms
+2026-09-18 11:00:03 INFO [order-service] Request processed in 93ms
+2026-09-18 11:00:03 ERROR [gateway] Upstream inventory-service responded 503 for GET /api/stock/232
+2026-09-18 11:03:47 INFO [order-service] Request processed in 121ms
+2026-09-18 11:03:47 WARN [order-service] Retry attempt 2 calling inventory-service
+2026-09-18 11:06:31 INFO [payment-service] Request processed in 62ms
+2026-09-18 11:09:28 INFO [reporting-service] Request processed in 160ms
+2026-09-18 11:12:17 INFO [order-service] Request processed in 130ms
+2026-09-18 11:12:17 WARN [order-service] Retry attempt 3 calling inventory-service

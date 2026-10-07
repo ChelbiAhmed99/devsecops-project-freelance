@@ -1,0 +1,219 @@
+<div class="page-header">
+  <div>
+    <p class="eyebrow">Brique 3</p>
+    <h1>Détection des vulnérabilités</h1>
+    <p class="page-header__lead">Failles connues dans les dépendances, les images Docker et le code, triées par priorité et suivies jusqu'à leur correction.</p>
+  </div>
+  <div class="actions">
+    <button class="btn" type="button" (click)="exportCsv()" title="Télécharge toutes les vulnérabilités au format CSV (Excel)">Exporter CSV</button>
+    <button class="btn" type="button" (click)="load()">Actualiser</button>
+  </div>
+</div>
+
+<details class="help">
+  <summary>Comment fonctionne cet écran ?</summary>
+  <div class="help__body">
+    <p>Trois outils alimentent la même liste ; chacun regarde un endroit différent :</p>
+    <ol class="steps">
+      <li><strong>OWASP Dependency-Check</strong> — les bibliothèques Java du projet (<code>pom.xml</code>) comparées à la base
+        publique des failles connues (CVE/NVD).</li>
+      <li><strong>Trivy</strong> — le contenu d'une image Docker : paquets du système et bibliothèques embarquées.</li>
+      <li><strong>SonarQube</strong> — le code source lui-même (injections, secrets en dur, bugs…), après une analyse
+        <code>mvn sonar:sonar</code>.</li>
+    </ol>
+    <p><strong>À chaque nouveau résultat d'un outil</strong>, l'assistant compare avec ce qu'il connaissait déjà de cet outil :
+      une faille jamais vue est créée au statut « Nouvelle » ; une faille qui n'apparaît plus passe automatiquement en
+      « Corrigée (auto) » ; une faille corrigée qui réapparaît est rouverte avec l'étiquette « régression ».</p>
+    <p><strong>Cycle de traitement :</strong> Nouvelle → En cours (« Prendre ») → Corrigée, ou bien Risque accepté / Faux positif
+      avec une note justificative. Seules « Nouvelle » et « En cours » comptent comme <em>ouvertes</em>.</p>
+    <p><strong>Colonne Prio. (0 à 100) :</strong> score CVSS × 8, +5 si la faille vient d'une dépendance ou d'une image
+      (exposée à l'exécution), +8 si une version corrigée existe (correction facile), +1 par semaine d'ancienneté (max 7).
+      Traitez la liste de haut en bas.</p>
+    <p><strong>Quality gate :</strong> le pipeline est bloqué s'il reste une vulnérabilité critique ouverte, ou plus de
+      5 vulnérabilités hautes ouvertes.</p>
+    <p class="muted">Rôles : tout le monde peut consulter et demander une analyse IA ; lancer un scan, importer un rapport et
+      changer un statut sont réservés au responsable qualité/sécurité et à l'administrateur.</p>
+  </div>
+</details>
+
+@if (stats(); as s) {
+  <section class="grid grid--4">
+    <button type="button" class="panel stat stat--action" [class.panel--critical]="(s.openBySeverity['CRITICAL'] ?? 0) > 0"
+            (click)="quickFilter('OPEN', 'CRITICAL')" title="Afficher les vulnérabilités critiques ouvertes">
+      <span class="stat__value">{{ s.openBySeverity['CRITICAL'] ?? 0 }}</span><span class="stat__label">critiques ouvertes · seuil quality gate : 0</span></button>
+    <button type="button" class="panel stat stat--action" (click)="quickFilter('OPEN', '')" title="Afficher toutes les vulnérabilités ouvertes">
+      <span class="stat__value">{{ s.open }}</span><span class="stat__label">ouvertes au total (nouvelles + en cours)</span></button>
+    <button type="button" class="panel stat stat--action" (click)="quickFilter('FIXED', '')" title="Afficher les vulnérabilités corrigées">
+      <span class="stat__value">{{ s.fixed }}</span><span class="stat__label">corrigées sur {{ s.total }} détectées</span></button>
+    <div class="panel stat" title="Délai moyen entre la première détection et la correction">
+      <span class="stat__value">{{ s.meanTimeToFixDays ?? '—' }}</span><span class="stat__label">jours pour corriger en moyenne (MTTR)</span></div>
+  </section>
+
+  <section class="grid grid--2">
+    <div class="panel"><h2>Ouvertes par sévérité</h2>
+      @if (severitySlices().length) { <app-donut-chart [slices]="severitySlices()" caption="ouvertes" /> } @else { <p class="empty">Aucune vulnérabilité ouverte.</p> }
+    </div>
+    <div class="panel"><h2>Ouvertes par outil</h2>
+      @if (sourceSlices().length) { <app-donut-chart [slices]="sourceSlices()" caption="ouvertes" /> } @else { <p class="empty">Aucune vulnérabilité ouverte.</p> }
+    </div>
+  </section>
+}
+
+<section class="panel">
+  <h2>Lancer une analyse</h2>
+  @if (auth.canManageSecurity()) {
+    <div class="scan-grid">
+      <div class="scan">
+        <button class="btn btn--block" type="button" [disabled]="isRunning('deps') || !toolOk('maven')" (click)="scan('deps')">
+          @if (isRunning('deps')) { <span class="spinner spinner--sm"></span> Scan des dépendances en cours… } @else { Scanner les dépendances (OWASP) }</button>
+        <p class="scan__hint">Analyse les bibliothèques du <code>pom.xml</code>. 2 à 5 min ; le premier lancement télécharge la base NVD
+          (20 à 60 min sans clé d'API NVD).</p>
+        @if (!toolOk('maven')) { <p class="scan__hint scan__hint--warn">Maven est indisponible sur le serveur : importez un rapport ci-dessous.</p> }
+        @if (lastResults()['deps']; as r) { <p class="scan__result scan__result--{{ r.ok ? 'ok' : 'ko' }}">{{ r.message }}</p> }
+      </div>
+
+      <div class="scan">
+        <div class="inline-form">
+          <input type="text" [(ngModel)]="image" [placeholder]="defaultImage() || 'image:tag'" aria-label="Image Docker à scanner" [disabled]="isRunning('image')" />
+          <button class="btn" type="button" [disabled]="isRunning('image') || !toolOk('trivy')" (click)="scan('image')">
+            @if (isRunning('image')) { <span class="spinner spinner--sm"></span> Scan… } @else { Scanner l'image (Trivy) }</button>
+        </div>
+        <p class="scan__hint">Saisissez une image (ex. <code>nginx:1.27</code>) ou laissez vide pour l'image par défaut. 1 à 3 min.</p>
+        @if (!toolOk('trivy')) { <p class="scan__hint scan__hint--warn">Trivy est indisponible sur le serveur : importez un rapport ci-dessous.</p> }
+        @else if (!toolOk('docker')) { <p class="scan__hint scan__hint--warn">Pas d'accès au démon Docker : seules les images d'un registre public peuvent être scannées.</p> }
+        @if (lastResults()['image']; as r) { <p class="scan__result scan__result--{{ r.ok ? 'ok' : 'ko' }}">{{ r.message }}</p> }
+      </div>
+
+      <div class="scan">
+        <button class="btn btn--block" type="button" [disabled]="isRunning('sonar') || !toolOk('sonarqube')" (click)="scan('sonar')">
+          @if (isRunning('sonar')) { <span class="spinner spinner--sm"></span> Synchronisation… } @else { Synchroniser SonarQube }</button>
+        <p class="scan__hint">Récupère les vulnérabilités et bugs de la dernière analyse SonarQube (quelques secondes).</p>
+        @if (!toolOk('sonarqube')) { <p class="scan__hint scan__hint--warn">SonarQube est désactivé ou injoignable (voir « Prérequis » ci-dessous).</p> }
+        @if (lastResults()['sonar']; as r) { <p class="scan__result scan__result--{{ r.ok ? 'ok' : 'ko' }}">{{ r.message }}</p> }
+      </div>
+
+      <div class="scan">
+        <p class="scan__title">Ou importer un rapport existant (JSON)</p>
+        <div class="inline-form">
+          <select [(ngModel)]="importType" aria-label="Type de rapport">
+            <option value="dependency-check">OWASP Dependency-Check</option>
+            <option value="trivy">Trivy</option>
+          </select>
+          <label class="btn"><input type="file" accept=".json" hidden (change)="importReport($event)" />Choisir le fichier…</label>
+        </div>
+        <p class="scan__hint">Choisissez d'abord le type, puis le fichier : l'import démarre aussitôt. Aucun outil requis sur le serveur.</p>
+        @if (lastResults()['import']; as r) { <p class="scan__result scan__result--{{ r.ok ? 'ok' : 'ko' }}">{{ r.message }}</p> }
+      </div>
+    </div>
+    <details class="help help--inline">
+      <summary>Prérequis des scans</summary>
+      <div class="help__body"><app-tool-status [tools]="tools()" [keys]="['maven', 'project', 'nvdApiKey', 'trivy', 'docker', 'sonarqube']" /></div>
+    </details>
+  } @else {
+    <p class="muted">Lancer un scan, importer un rapport et changer un statut sont réservés au responsable
+      qualité/sécurité. Vous pouvez consulter chaque vulnérabilité et demander une explication à l'IA.</p>
+  }
+</section>
+
+<form class="toolbar" (ngSubmit)="load()">
+  <input type="search" name="q" [(ngModel)]="filter.q" placeholder="Rechercher : CVE, composant, description…" aria-label="Recherche" />
+  <select name="status" [(ngModel)]="filter.status" (change)="load()" aria-label="Statut">
+    <option value="OPEN">Ouvertes (nouvelles + en cours)</option>
+    <option value="">Tous statuts</option>
+    @for (st of statuses; track st) { <option [value]="st">{{ st | lbl }}</option> }
+  </select>
+  <select name="severity" [(ngModel)]="filter.severity" (change)="load()" aria-label="Sévérité">
+    <option value="">Toutes sévérités</option>
+    <option value="CRITICAL">Critique</option><option value="HIGH">Haute</option>
+    <option value="MEDIUM">Moyenne</option><option value="LOW">Faible</option>
+  </select>
+  <select name="source" [(ngModel)]="filter.source" (change)="load()" aria-label="Outil">
+    <option value="">Tous outils</option>
+    <option value="dependency-check">OWASP Dependency-Check</option>
+    <option value="trivy">Trivy</option>
+    <option value="sonarqube">SonarQube</option>
+  </select>
+  <button class="btn btn--primary" type="submit">Rechercher</button>
+  @if (hasCustomFilters()) { <button class="btn btn--ghost" type="button" (click)="resetFilters()">Réinitialiser</button> }
+  <span class="muted">{{ vulns().length }} résultat(s) · cliquez sur une ligne pour le détail</span>
+</form>
+
+<div class="split" [class.split--open]="!!selected()">
+  <div class="panel panel--flush">
+    <table class="table">
+      <thead><tr><th title="Score de priorité de 0 à 100 : traitez la liste de haut en bas">Prio.</th><th>Identifiant</th><th>Sévérité</th><th>Composant concerné</th><th>Outil</th><th>Statut</th><th></th></tr></thead>
+      <tbody>
+        @for (v of vulns(); track v.recordId) {
+          <tr class="clickable" [class.selected]="selected()?.recordId === v.recordId" (click)="select(v)">
+            <td><span class="priority priority--{{ v.severity | sev }}">{{ v.priorityScore }}</span></td>
+            <td><strong class="mono">{{ v.id }}</strong>
+              @if (v.reopened) { <span class="badge badge--critical" title="Réapparue après avoir été corrigée">régression</span> }</td>
+            <td><span class="badge badge--{{ v.severity | sev }}">{{ severityLabel(v.severity) }}</span>
+              @if (v.cvssScore) { <span class="muted mono" title="Score CVSS (0 à 10)">{{ v.cvssScore }}</span> }</td>
+            <td class="truncate" [title]="v.affectedComponent">{{ v.affectedComponent }}
+              @if (v.fixedVersion) { <span class="fix" title="Version qui corrige la faille">→ {{ v.fixedVersion }}</span> }</td>
+            <td class="muted">{{ sourceLabel(v.source) }}</td>
+            <td><span class="badge badge--status-{{ v.status }}">{{ v.status | lbl }}</span>
+              @if (v.autoResolved) { <span class="muted" title="Plus détectée par le dernier scan : clôturée automatiquement">(auto)</span> }
+              @if (v.assignee) { <span class="muted">· {{ v.assignee }}</span> }</td>
+            <td class="nowrap" (click)="$event.stopPropagation()">
+              <button class="btn btn--sm" type="button" (click)="explainVuln(v)" title="Explication et correctif proposés par l'IA">Expliquer (IA)</button>
+              @if (auth.canManageSecurity() && v.status === 'NEW') {
+                <button class="btn btn--sm" type="button" (click)="take(v)" title="Passer en cours et me l'assigner">Prendre</button>
+              }
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="7" class="empty">
+            @if (loading()) { Chargement… }
+            @else if (hasCustomFilters()) { Aucune vulnérabilité ne correspond à ces filtres. <button class="link" type="button" (click)="resetFilters()">Réinitialiser les filtres</button> }
+            @else { Aucune vulnérabilité ouverte. Lancez une analyse ou importez un rapport pour vérifier. }
+          </td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (selected(); as v) {
+    <aside class="panel detail panel--{{ v.severity | sev }}">
+      <header class="panel__header">
+        <h2 class="mono">{{ v.id }}</h2>
+        <button class="icon-btn" type="button" aria-label="Fermer le détail" (click)="selected.set(null)">×</button>
+      </header>
+      <p><span class="badge badge--{{ v.severity | sev }}">{{ severityLabel(v.severity) }}</span>
+        @if (v.cvssScore) { CVSS <strong>{{ v.cvssScore }}</strong>/10 · } priorité <strong>{{ v.priorityScore }}</strong>/100
+        @if (v.reopened) { <span class="badge badge--critical">régression</span> }</p>
+      <dl class="props">
+        <dt>Composant</dt><dd class="mono">{{ v.affectedComponent }}</dd>
+        <dt>Version corrigée</dt><dd>{{ v.fixedVersion ?? 'non connue' }}</dd>
+        <dt>Outil</dt><dd>{{ sourceLabel(v.source) }}</dd>
+        <dt>Détectée</dt><dd>{{ v.firstDetectedAt | dt }} (dernier scan : {{ v.lastDetectedAt | relative }})</dd>
+        @if (v.resolvedAt) { <dt>Résolue</dt><dd>{{ v.resolvedAt | dt }}{{ v.autoResolved ? ' (automatiquement)' : '' }}</dd> }
+      </dl>
+      <p class="description">{{ v.description }}</p>
+      <p class="advice"><strong>Que faire ?</strong> {{ advice(v) }}</p>
+      @if (v.id.startsWith('CVE-')) {
+        <p><a [href]="'https://nvd.nist.gov/vuln/detail/' + v.id" target="_blank" rel="noopener">Fiche officielle NVD ↗</a></p>
+      }
+      <button class="btn btn--primary btn--block" type="button" (click)="explainVuln(v)">Expliquer et proposer un correctif (IA)</button>
+
+      @if (auth.canManageSecurity()) {
+        <h3>Suivi</h3>
+        <label class="field"><span>Statut</span>
+          <select [(ngModel)]="edit.status">
+            @for (st of statuses; track st) { <option [value]="st">{{ st | lbl }}</option> }
+          </select></label>
+        <label class="field"><span>Assignée à</span><input type="text" [(ngModel)]="edit.assignee" placeholder="identifiant (ex. dev)" /></label>
+        <label class="field"><span>Note (justification, lien vers le ticket…)</span><textarea rows="3" [(ngModel)]="edit.note"></textarea></label>
+        <button class="btn btn--block" type="button" [disabled]="saving()" (click)="save()">{{ saving() ? 'Enregistrement…' : 'Enregistrer le suivi' }}</button>
+      } @else {
+        <p class="muted">Statut : {{ v.status | lbl }}{{ v.assignee ? ' · assignée à ' + v.assignee : '' }}</p>
+        @if (v.note) { <p class="muted">Note : {{ v.note }}</p> }
+      }
+    </aside>
+  }
+</div>
+
+@if (explain(); as req) {
+  <app-explain-dialog [request]="req" (closed)="explain.set(null)" />
+}

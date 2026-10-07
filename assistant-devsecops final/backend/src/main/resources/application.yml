@@ -1,0 +1,125 @@
+server:
+  port: 8080
+  # Nécessaire derrière un reverse proxy (nginx du frontend)
+  forward-headers-strategy: framework
+
+spring:
+  application:
+    name: assistant-devsecops-backend
+  # Base de données : H2 fichier par défaut (dev local sans rien installer),
+  # PostgreSQL en Docker/production via les variables DB_URL / DB_USERNAME / DB_PASSWORD.
+  datasource:
+    url: ${DB_URL:jdbc:h2:file:./data/assistant;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;AUTO_SERVER=TRUE}
+    username: ${DB_USERNAME:sa}
+    password: ${DB_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 100
+        order_inserts: true
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 60MB
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+assistant:
+  # ---------- Sécurité applicative ----------
+  jwt:
+    # OBLIGATOIRE en production : secret d'au moins 32 caractères (variable JWT_SECRET).
+    secret: ${JWT_SECRET:dev-only-secret-change-me-please-0123456789abcdef}
+    expiration-minutes: ${JWT_EXPIRATION_MINUTES:480}
+  ci:
+    # Clé d'API utilisée par le pipeline CI/CD (en-tête X-API-Key). Vide = désactivée.
+    api-key: ${CI_API_KEY:}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
+  bootstrap:
+    # Comptes créés au tout premier démarrage (base vide). À changer ensuite depuis l'écran Administration.
+    admin-password: ${BOOTSTRAP_ADMIN_PASSWORD:Admin@2026}
+    quality-password: ${BOOTSTRAP_QUALITY_PASSWORD:Qualite@2026}
+    developer-password: ${BOOTSTRAP_DEVELOPER_PASSWORD:Dev@2026}
+  login:
+    max-attempts: 5
+    lock-minutes: 5
+
+  # ---------- Mode démonstration ----------
+  demo:
+    # Précharge des données d'exemple (logs, vulnérabilités, exécution de tests) si la base est vide.
+    enabled: ${ASSISTANT_DEMO_ENABLED:true}
+
+  # ---------- Brique logs ----------
+  logs:
+    anomaly-threshold: 3
+    similarity-threshold: 0.6
+    # Détection de pics : taille des fenêtres temporelles et sensibilité (z-score)
+    spike-bucket-minutes: 5
+    spike-z-threshold: 2.5
+    spike-min-count: 3
+    # Nombre maximal de logs chargés pour l'analyse (les plus récents)
+    analysis-window: 20000
+    retention-days: ${LOG_RETENTION_DAYS:30}
+    loki:
+      enabled: ${LOKI_ENABLED:false}
+      url: ${LOKI_URL:http://localhost:3100}
+      query: '{job=~".+"}'
+      poll-interval-ms: 30000
+
+  # ---------- Brique tests ----------
+  tests:
+    project-path: ${TESTS_PROJECT_PATH:.}
+    reports-path: ${TESTS_REPORTS_PATH:target/surefire-reports}
+    coverage-report-path: ${TESTS_COVERAGE_PATH:target/site/jacoco/jacoco.xml}
+    timeout-seconds: 600
+    flaky-window: 10
+
+  # ---------- Brique sécurité ----------
+  security:
+    project-path: ${SECURITY_PROJECT_PATH:.}
+    report-path: ${SECURITY_REPORT_PATH:target/dependency-check-report.json}
+    scan-timeout-seconds: 1800
+    sonar:
+      enabled: ${SONAR_ENABLED:true}
+      host-url: ${SONAR_HOST_URL:http://localhost:9000}
+      project-key: ${SONAR_PROJECT_KEY:assistant-devsecops-backend}
+      # Ne jamais committer de vraie valeur : variable SONAR_TOKEN.
+      token: ${SONAR_TOKEN:}
+      sync-interval-ms: 600000
+    trivy:
+      image-name: ${TRIVY_IMAGE:assistant-devsecops-backend:latest}
+
+  # ---------- Quality gate (utilisé par le pipeline CI/CD) ----------
+  quality-gate:
+    max-critical-vulnerabilities: 0
+    max-high-vulnerabilities: 5
+    min-test-success-rate: 95
+    min-line-coverage: 40
+    max-critical-anomalies: 10
+
+  # ---------- Brique IA ----------
+  ai:
+    service-url: ${AI_SERVICE_URL:http://localhost:8000}
+    timeout-seconds: 60
+
+logging:
+  level:
+    com.vermeg.assistant: INFO

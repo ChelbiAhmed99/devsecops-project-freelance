@@ -1,0 +1,238 @@
+<div class="page-header">
+  <div>
+    <p class="eyebrow">Brique 1</p>
+    <h1>Analyse des logs</h1>
+  </div>
+  <div class="actions">
+    <button class="btn" type="button" (click)="refresh()">Actualiser</button>
+    @if (auth.isAdmin()) {
+      <button class="btn btn--danger" type="button" (click)="clearAll()">Purger</button>
+    }
+  </div>
+</div>
+
+<details class="help">
+  <summary>Comment fonctionne cet écran ?</summary>
+  <div class="help__body">
+    <p>Les logs arrivent par l'onglet <strong>Ingestion</strong> (coller du texte ou importer un fichier), par le pipeline
+      CI/CD (<code>POST /api/ci/logs</code>) ou par la collecte Loki si elle est activée. L'assistant ne garde pour
+      l'analyse que les lignes WARN, ERROR et FATAL.</p>
+    <ol class="steps">
+      <li><strong>Anomalies</strong> — les messages d'erreur sont nettoyés de leurs parties variables (nombres, identifiants,
+        adresses IP) puis regroupés : dix erreurs « timeout sur la commande 1234 / 5678… » deviennent un seul groupe de
+        10 occurrences. Un groupe est <em>critique</em> à partir de 3 occurrences, ou dès la première s'il est FATAL.
+        Le moteur « Local » regroupe par mots communs ; le moteur « IA » utilise le service de machine learning.</li>
+      <li><strong>Pics de fréquence</strong> — le volume d'erreurs est découpé en fenêtres de 5 minutes ; une fenêtre
+        nettement au-dessus de la normale est signalée comme pic.</li>
+      <li><strong>Explorateur</strong> — recherche libre dans tous les logs (niveau, service, texte, période).</li>
+      <li><strong>Ingestion</strong> — ajout manuel de logs.</li>
+    </ol>
+    <p>Sur chaque anomalie, « Expliquer (IA) » demande une cause probable et une correction à l'assistant IA.</p>
+  </div>
+</details>
+
+@if (stats(); as s) {
+  <section class="grid grid--4">
+    <div class="panel stat"><span class="stat__value">{{ s.total }}</span><span class="stat__label">logs stockés</span></div>
+    <div class="panel stat" [class.panel--high]="s.errorRatePercent > 10"><span class="stat__value">{{ s.errorRatePercent }}%</span><span class="stat__label">taux d'erreur</span></div>
+    <div class="panel stat"><span class="stat__value">{{ anomalies().length }}</span><span class="stat__label">groupes d'anomalies</span></div>
+    <div class="panel stat"><span class="stat__value">{{ s.lastAt | relative }}</span><span class="stat__label">dernier log</span></div>
+  </section>
+
+  <section class="grid grid--3-1">
+    <div class="panel">
+      <h2>Volume dans le temps</h2>
+      @if (timelineBars().length) {
+        <app-bar-chart [data]="timelineBars()" [legend]="['Autres', 'Erreurs']" ariaLabel="Volume de logs par fenêtre de temps" />
+      } @else { <p class="empty">Aucun log.</p> }
+    </div>
+    <div class="panel">
+      <h2>Par niveau</h2>
+      <ul class="bars-list">
+        @for (e of levelEntries(); track e[0]) {
+          <li><span class="badge badge--{{ e[0] | sev }}">{{ e[0] }}</span><span class="mono">{{ e[1] }}</span></li>
+        }
+      </ul>
+      <h2>Par service</h2>
+      <ul class="bars-list">
+        @for (e of sourceEntries(); track e[0]) {
+          <li><button class="link" type="button" (click)="filterBySource(e[0])">{{ e[0] }}</button><span class="mono">{{ e[1] }}</span></li>
+        }
+      </ul>
+    </div>
+  </section>
+}
+
+<nav class="tabs" role="tablist">
+  <button role="tab" type="button" [class.active]="tab() === 'anomalies'" (click)="selectTab('anomalies')">Anomalies</button>
+  <button role="tab" type="button" [class.active]="tab() === 'spikes'" (click)="selectTab('spikes')">Pics de fréquence</button>
+  <button role="tab" type="button" [class.active]="tab() === 'explorer'" (click)="selectTab('explorer')">Explorateur</button>
+  <button role="tab" type="button" [class.active]="tab() === 'ingest'" (click)="selectTab('ingest')">Ingestion</button>
+</nav>
+
+@switch (tab()) {
+  @case ('anomalies') {
+    <div class="toolbar">
+      <div class="segmented" role="group" aria-label="Moteur de regroupement">
+        <button type="button" [class.active]="engine() === 'local'" (click)="setEngine('local')">Local (Jaccard)</button>
+        <button type="button" [class.active]="engine() === 'ml'" (click)="setEngine('ml')">IA (TF-IDF + DBSCAN)</button>
+      </div>
+      <select [value]="categoryFilter()" (change)="categoryFilter.set($any($event.target).value)" aria-label="Catégorie">
+        <option value="">Toutes catégories</option>
+        @for (c of categories(); track c) { <option [value]="c">{{ c | lbl: 'category' }}</option> }
+      </select>
+      <label class="checkbox"><input type="checkbox" [checked]="onlyCritical()" (change)="onlyCritical.set(!onlyCritical())" /> Critiques uniquement</label>
+      <span class="muted">Moteur utilisé : <code>{{ engineUsed() }}</code></span>
+    </div>
+
+    @if (loadingAnomalies()) {
+      <div class="loading"><span class="spinner"></span> Analyse…</div>
+    }
+    @for (a of filteredAnomalies(); track a.key) {
+      <article class="panel anomaly panel--{{ a.critical ? 'critical' : (a.level | sev) }}">
+        <header class="anomaly__header">
+          <div>
+            <span class="badge badge--{{ a.critical ? 'critical' : (a.level | sev) }}">{{ a.critical ? 'CRITIQUE' : a.level }}</span>
+            <span class="badge badge--outline">{{ a.category | lbl: 'category' }}</span>
+            <span class="muted">{{ a.occurrences }} occurrence(s) · {{ a.firstSeen | dt }} → {{ a.lastSeen | dt }}</span>
+          </div>
+          <div class="actions">
+            <button class="btn btn--sm" type="button" (click)="toggle(a.key)">{{ expanded() === a.key ? 'Masquer' : 'Détails' }}</button>
+            <button class="btn btn--sm btn--primary" type="button" (click)="explainAnomaly(a)">Expliquer (IA)</button>
+          </div>
+        </header>
+        <p class="mono anomaly__message">{{ a.normalizedMessage }}</p>
+        <p class="anomaly__summary">{{ a.summary }}</p>
+        <p class="muted">Services : @for (s of a.affectedSources; track s) { <button class="link" type="button" (click)="filterBySource(s)">{{ s }}</button>&nbsp; }</p>
+        @if (expanded() === a.key) {
+          <div class="examples">
+            @for (ex of a.examples; track $index) {
+              <div class="log-line">
+                <span class="muted mono">{{ ex.timestamp | dt }}</span>
+                <span class="badge badge--{{ ex.level | sev }}">{{ ex.level }}</span>
+                <span class="mono">[{{ ex.source }}] {{ ex.message }}</span>
+              </div>
+              @if (ex.stackTrace) { <pre class="code-block">{{ ex.stackTrace }}</pre> }
+            }
+          </div>
+        }
+      </article>
+    } @empty {
+      @if (!loadingAnomalies()) { <p class="empty">Aucune anomalie ne correspond aux filtres.</p> }
+    }
+  }
+
+  @case ('spikes') {
+    @if (spikes(); as sp) {
+      <div class="panel">
+        <div class="panel__header">
+          <h2>Erreurs par fenêtre de {{ sp.bucketMinutes }} min</h2>
+          <span class="muted">Méthode : <code>{{ sp.method }}</code></span>
+        </div>
+        <app-bar-chart [data]="spikeBars()" [colors]="['#e0a800', '#f62e30']" [legend]="['Warnings', 'Erreurs']"
+                       ariaLabel="Erreurs par fenêtre de temps, pics surlignés" />
+        <p class="muted">Les barres surlignées correspondent aux fenêtres détectées comme anormales.</p>
+      </div>
+      <div class="panel">
+        <h2>Pics détectés ({{ sp.spikes.length }})</h2>
+        <table class="table">
+          <thead><tr><th>Fenêtre</th><th>Service</th><th>Erreurs</th><th>Normale</th><th>Score</th><th>Méthode</th></tr></thead>
+          <tbody>
+            @for (s of sp.spikes; track $index) {
+              <tr>
+                <td class="mono">{{ s.bucketStart | dt }}</td>
+                <td><button class="link" type="button" (click)="filterBySource(s.source)">{{ s.source }}</button></td>
+                <td class="mono">{{ s.count }}</td><td class="mono">{{ s.baseline }}</td>
+                <td class="mono">{{ s.score }}</td><td><code>{{ s.method }}</code></td>
+              </tr>
+            } @empty {
+              <tr><td colspan="6" class="empty">Aucun pic anormal : le volume d'erreurs est stable.</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <div class="loading"><span class="spinner"></span> Calcul…</div>
+    }
+  }
+
+  @case ('explorer') {
+    <form class="toolbar" (ngSubmit)="runSearch(0)">
+      <input type="search" name="q" placeholder="Rechercher dans les messages…" [(ngModel)]="search.q" />
+      <select name="level" [(ngModel)]="search.level" aria-label="Niveau">
+        <option value="">Tous niveaux</option>
+        <option value="ERROR,FATAL">Erreurs</option>
+        <option value="WARN">Warnings</option>
+        <option value="INFO">Info</option>
+        <option value="FATAL">Fatal</option>
+      </select>
+      <select name="source" [(ngModel)]="search.source" aria-label="Service">
+        <option value="">Tous services</option>
+        @for (s of sources(); track s) { <option [value]="s">{{ s }}</option> }
+      </select>
+      <input type="datetime-local" name="from" [(ngModel)]="search.from" aria-label="Depuis" />
+      <input type="datetime-local" name="to" [(ngModel)]="search.to" aria-label="Jusqu'à" />
+      <button class="btn btn--primary" type="submit">Rechercher</button>
+    </form>
+
+    @if (page(); as p) {
+      <div class="panel panel--flush">
+        <table class="table table--logs">
+          <thead><tr><th>Horodatage</th><th>Niveau</th><th>Service</th><th>Message</th></tr></thead>
+          <tbody>
+            @for (l of p.content; track l.id ?? $index) {
+              <tr (click)="toggle('log-' + (l.id ?? $index))" [class.clickable]="!!l.stackTrace">
+                <td class="mono nowrap">{{ l.timestamp | dt }}</td>
+                <td><span class="badge badge--{{ l.level | sev }}">{{ l.level }}</span></td>
+                <td>{{ l.source }}</td>
+                <td class="mono">{{ l.message }} @if (l.stackTrace) { <span class="muted">[trace]</span> }</td>
+              </tr>
+              @if (l.stackTrace && expanded() === 'log-' + (l.id ?? $index)) {
+                <tr><td colspan="4"><pre class="code-block">{{ l.stackTrace }}</pre></td></tr>
+              }
+            } @empty {
+              <tr><td colspan="4" class="empty">Aucun résultat.</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <button class="btn btn--sm" type="button" [disabled]="p.page === 0" (click)="runSearch(p.page - 1)">← Précédent</button>
+        <span class="muted">Page {{ p.page + 1 }} / {{ p.totalPages || 1 }} · {{ p.totalElements }} résultat(s)</span>
+        <button class="btn btn--sm" type="button" [disabled]="p.page + 1 >= p.totalPages" (click)="runSearch(p.page + 1)">Suivant →</button>
+      </div>
+    }
+  }
+
+  @case ('ingest') {
+    <section class="grid grid--2">
+      <div class="panel">
+        <h2>Coller des logs</h2>
+        <p class="muted">Formats reconnus : classique <code>date NIVEAU [service] message</code>, Spring Boot 3, JSON (Logstash/ECS), traces de pile.</p>
+        <label class="field"><span>Service par défaut (optionnel)</span>
+          <input type="text" [(ngModel)]="ingestSource" placeholder="ex. payment-service" /></label>
+        <textarea rows="10" [(ngModel)]="rawLogs" placeholder="2026-09-18 10:00:00 ERROR [payment-service] Connection timeout..."></textarea>
+        <div class="actions">
+          <button class="btn btn--primary" type="button" [disabled]="ingesting() || !rawLogs.trim()" (click)="ingest()">
+            {{ ingesting() ? 'Ingestion…' : 'Ingérer' }}
+          </button>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Importer un fichier</h2>
+        <p class="muted">Fichier .log / .txt / .json (50 Mo max).</p>
+        <label class="dropzone">
+          <input type="file" accept=".log,.txt,.json,.ndjson" (change)="upload($event)" [disabled]="ingesting()" />
+          <span>Choisir un fichier de logs</span>
+        </label>
+        <h3>Collecte automatique</h3>
+        <p class="muted">Les pipelines CI/CD envoient leurs logs sur <code>POST /api/ci/logs</code> (clé d'API) et la collecte
+          Grafana Loki peut être activée (<code>LOKI_ENABLED=true</code>).</p>
+      </div>
+    </section>
+  }
+}
+
+@if (explain(); as req) {
+  <app-explain-dialog [request]="req" (closed)="explain.set(null)" />
+}

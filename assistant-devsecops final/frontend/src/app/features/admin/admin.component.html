@@ -1,0 +1,103 @@
+<div class="page-header">
+  <div>
+    <p class="eyebrow">Administration</p>
+    <h1>Utilisateurs et traçabilité</h1>
+  </div>
+</div>
+
+<details class="help">
+  <summary>Rôles et journal d'audit</summary>
+  <div class="help__body">
+    <p><strong>Développeur</strong> : consulte tout, ingère des logs, lance les tests, importe des rapports de tests, demande
+      et valide des analyses IA. <strong>Responsable qualité / sécurité</strong> : en plus, lance les scans de sécurité,
+      importe leurs rapports, change le statut des vulnérabilités et lit le journal d'audit.
+      <strong>Administrateur</strong> : en plus, gère les comptes et peut purger les logs.</p>
+    <p>Le <strong>journal d'audit</strong> enregistre qui a fait quoi : connexions (réussies et échouées), scans, imports,
+      changements de statut, gestion des comptes. Après 5 mots de passe erronés, un compte est verrouillé 5 minutes.</p>
+  </div>
+</details>
+
+<nav class="tabs" role="tablist">
+  @if (auth.isAdmin()) {
+    <button role="tab" type="button" [class.active]="tab() === 'users'" (click)="tab.set('users')">Utilisateurs</button>
+  }
+  <button role="tab" type="button" [class.active]="tab() === 'audit'" (click)="tab.set('audit')">Journal d'audit</button>
+</nav>
+
+@if (tab() === 'users' && auth.isAdmin()) {
+  <div class="toolbar">
+    <button class="btn btn--primary" type="button" (click)="create()">Nouvel utilisateur</button>
+  </div>
+  <div class="panel panel--flush">
+    <table class="table">
+      <thead><tr><th>Identifiant</th><th>Nom</th><th>Rôle</th><th>État</th><th>Dernière connexion</th><th></th></tr></thead>
+      <tbody>
+        @for (u of users(); track u.id) {
+          <tr>
+            <td class="mono"><strong>{{ u.username }}</strong></td>
+            <td>{{ u.fullName }}<br /><span class="muted">{{ u.email }}</span></td>
+            <td><span class="badge badge--outline">{{ u.role | lbl: 'role' }}</span></td>
+            <td><span class="badge badge--{{ u.enabled ? 'ok' : 'low' }}">{{ u.enabled ? 'Actif' : 'Désactivé' }}</span></td>
+            <td class="muted">{{ u.lastLoginAt | relative }}</td>
+            <td class="nowrap">
+              <button class="btn btn--sm" type="button" (click)="edit(u)">Modifier</button>
+              @if (u.username !== auth.user()?.username) {
+                <button class="btn btn--sm" type="button" (click)="toggleEnabled(u)">{{ u.enabled ? 'Désactiver' : 'Activer' }}</button>
+                <button class="btn btn--sm btn--danger" type="button" (click)="remove(u)">Supprimer</button>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+@if (tab() === 'audit') {
+  <div class="toolbar">
+    <input type="search" [(ngModel)]="auditFilter" placeholder="Filtrer (utilisateur, action, cible…)" aria-label="Filtre" />
+    <button class="btn" type="button" (click)="loadAudit()">Actualiser</button>
+  </div>
+  <div class="panel panel--flush">
+    <table class="table">
+      <thead><tr><th>Date</th><th>Utilisateur</th><th>Action</th><th>Cible</th><th>Détails</th></tr></thead>
+      <tbody>
+        @for (a of filteredAudit(); track a.id) {
+          <tr>
+            <td class="mono nowrap">{{ a.at | dt }}</td>
+            <td>{{ a.username }}</td>
+            <td><code>{{ a.action }}</code></td>
+            <td class="truncate" [title]="a.target ?? ''">{{ a.target }}</td>
+            <td class="muted">{{ a.details }}</td>
+          </tr>
+        } @empty {
+          <tr><td colspan="5" class="empty">Aucun événement.</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+@if (formOpen()) {
+  <div class="modal-backdrop" (click)="formOpen.set(false)">
+    <form class="modal modal--sm" (click)="$event.stopPropagation()" (ngSubmit)="save()">
+      <h2>{{ editing() ? 'Modifier ' + editing()!.username : 'Nouvel utilisateur' }}</h2>
+      @if (!editing()) {
+        <label class="field"><span>Identifiant</span><input type="text" name="username" [(ngModel)]="form.username" required /></label>
+      }
+      <label class="field"><span>Nom complet</span><input type="text" name="fullName" [(ngModel)]="form.fullName" /></label>
+      <label class="field"><span>E-mail</span><input type="email" name="email" [(ngModel)]="form.email" /></label>
+      <label class="field"><span>Rôle</span>
+        <select name="role" [(ngModel)]="form.role">
+          @for (r of roles; track r) { <option [value]="r">{{ r | lbl: 'role' }}</option> }
+        </select></label>
+      <label class="field"><span>{{ editing() ? 'Nouveau mot de passe (laisser vide pour conserver)' : 'Mot de passe' }}</span>
+        <input type="password" name="password" [(ngModel)]="form.password" autocomplete="new-password" /></label>
+      <p class="muted">8 caractères minimum, dont au moins une lettre et un chiffre.</p>
+      <div class="actions">
+        <button class="btn btn--primary" type="submit">Enregistrer</button>
+        <button class="btn" type="button" (click)="formOpen.set(false)">Annuler</button>
+      </div>
+    </form>
+  </div>
+}

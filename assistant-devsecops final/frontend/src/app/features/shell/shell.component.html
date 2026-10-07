@@ -1,0 +1,81 @@
+<div class="shell" [class.shell--menu-open]="menuOpen()">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo-plate"><img src="branding/vermeg-logo.jpg" alt="Vermeg" /></div>
+      <span class="brand-title">Assistant DevSecOps</span>
+    </div>
+
+    <nav>
+      @for (item of visibleNav(); track item.path) {
+        <a [routerLink]="item.path" routerLinkActive="active" class="nav-link" (click)="menuOpen.set(false)">
+          <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"
+               stroke-linecap="round" stroke-linejoin="round"><path [attr.d]="item.icon" /></svg>
+          {{ item.label }}
+        </a>
+      }
+    </nav>
+
+    <div class="user-box">
+      @if (auth.user(); as user) {
+        <p class="user-name">{{ user.fullName || user.username }}</p>
+        <p class="user-role">{{ user.role | lbl: 'role' }}</p>
+      }
+      <button class="btn btn--ghost btn--sm" type="button" (click)="passwordOpen.set(true)">Mot de passe</button>
+      <button class="btn btn--ghost btn--sm" type="button" (click)="logout()">Se déconnecter</button>
+    </div>
+  </aside>
+
+  <div class="main-column">
+    <header class="topbar">
+      <button class="icon-btn menu-toggle" type="button" aria-label="Menu" (click)="menuOpen.set(!menuOpen())">☰</button>
+      <div>
+        @if (auth.user(); as user) { <p class="greeting">Bonjour, {{ user.fullName || user.username }}</p> }
+        <p class="today">{{ todayLabel }}</p>
+      </div>
+      <div class="topbar__actions">
+        <span class="live-dot" [class.live-dot--on]="events.connected()"
+              [title]="events.connected() ? 'Notifications temps réel actives' : 'Notifications temps réel déconnectées'"></span>
+        <button class="icon-btn bell" type="button" aria-label="Notifications" (click)="toggleNotifications()">
+          <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6">
+            <path d="M5 8a5 5 0 0 1 10 0c0 5 2 6 2 6H3s2-1 2-6M8.5 17a1.7 1.7 0 0 0 3 0" />
+          </svg>
+          @if (events.unread() > 0) { <span class="bell__count">{{ events.unread() }}</span> }
+        </button>
+        @if (notificationsOpen()) {
+          <div class="notifications">
+            <p class="eyebrow">Notifications</p>
+            @for (n of events.notifications(); track $index) {
+              <div class="notification notification--{{ n.severity }}">
+                <strong>{{ n.title }}</strong>
+                @if (detail(n); as d) { <span class="notification__detail">{{ d }}</span> }
+                <span class="muted">{{ n.at | relative }}</span>
+              </div>
+            } @empty {
+              <p class="muted">Aucune notification pour le moment.</p>
+            }
+          </div>
+        }
+      </div>
+    </header>
+
+    <main class="content">
+      <router-outlet />
+    </main>
+  </div>
+</div>
+
+@if (passwordOpen()) {
+  <div class="modal-backdrop" (click)="passwordOpen.set(false)">
+    <form class="modal modal--sm" (click)="$event.stopPropagation()" (ngSubmit)="changePassword()">
+      <h2>Changer mon mot de passe</h2>
+      <label class="field"><span>Mot de passe actuel</span>
+        <input type="password" name="current" [(ngModel)]="currentPassword" autocomplete="current-password" /></label>
+      <label class="field"><span>Nouveau mot de passe (8 caractères min., lettre + chiffre)</span>
+        <input type="password" name="new" [(ngModel)]="newPassword" autocomplete="new-password" /></label>
+      <div class="actions">
+        <button class="btn btn--primary" type="submit">Enregistrer</button>
+        <button class="btn" type="button" (click)="passwordOpen.set(false)">Annuler</button>
+      </div>
+    </form>
+  </div>
+}

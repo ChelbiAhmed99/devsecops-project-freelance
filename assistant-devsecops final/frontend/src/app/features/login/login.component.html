@@ -1,0 +1,57 @@
+<div class="login-screen">
+  <div class="login-brand-panel">
+    <div class="brand-logo-plate">
+      <img src="branding/vermeg-logo.jpg" alt="Vermeg" />
+    </div>
+    <div class="brand-pitch">
+      <h1>Un copilote DevSecOps pour vos équipes</h1>
+      <p>
+        Logs, tests automatisés, vulnérabilités et recommandations IA, centralisés
+        au même endroit pour accélérer le diagnostic et la remédiation.
+      </p>
+      <ul class="brand-features">
+        <li>Détection d'anomalies et de pics d'erreurs (statistique + machine learning)</li>
+        <li>Tests consolidés, couverture, tests instables et corrélation avec les logs</li>
+        <li>Vulnérabilités OWASP / Trivy / SonarQube priorisées et suivies</li>
+        <li>Explications IA validées par un humain et copilote conversationnel</li>
+      </ul>
+    </div>
+    <div class="brand-stats">
+      <div><span class="stat-number">30+</span><span class="stat-label">ans d'expertise</span></div>
+      <div><span class="stat-number">40+</span><span class="stat-label">pays</span></div>
+      <div><span class="stat-number">160+</span><span class="stat-label">clients</span></div>
+    </div>
+  </div>
+
+  <div class="login-form-panel">
+    <form class="login-card" (ngSubmit)="submit()">
+      <p class="eyebrow">Connexion</p>
+      <h2>Accéder au tableau de bord</h2>
+      <p class="subtitle">Authentification sécurisée (JWT) avec gestion des rôles.</p>
+
+      <label class="field">
+        <span>Nom d'utilisateur</span>
+        <input type="text" name="username" autocomplete="username" [(ngModel)]="username" autofocus />
+      </label>
+      <label class="field">
+        <span>Mot de passe</span>
+        <input type="password" name="password" autocomplete="current-password" [(ngModel)]="password" />
+      </label>
+
+      @if (error()) {
+        <p class="alert alert--error">{{ error() }}</p>
+      }
+
+      <button class="btn btn--primary btn--block" type="submit" [disabled]="loading()">
+        {{ loading() ? 'Connexion…' : 'Se connecter' }}
+      </button>
+
+      <div class="demo-accounts">
+        <p class="muted">Comptes de démonstration (à changer en production) :</p>
+        @for (a of demoAccounts; track a.username) {
+          <button type="button" class="chip" (click)="fill(a)">{{ a.username }} · {{ a.label }}</button>
+        }
+      </div>
+    </form>
+  </div>
+</div>

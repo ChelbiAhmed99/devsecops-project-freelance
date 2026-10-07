@@ -1,0 +1,19 @@
+2026-09-18 08:12:03 INFO [payment-service] Application started successfully
+2026-09-18 08:15:11 INFO [payment-service] Health check OK
+2026-09-18 08:22:41 ERROR [payment-service] Connection timeout to database after 30000ms
+2026-09-18 08:23:02 WARN [payment-service] Retry attempt 1 for database connection
+2026-09-18 08:23:41 ERROR [payment-service] Connection timeout to database after 30000ms
+2026-09-18 08:30:15 INFO [auth-service] User a1b2c3d4-e5f6-7890-abcd-ef1234567890 logged in
+2026-09-18 08:31:22 ERROR [auth-service] Invalid token signature for request id 55219
+2026-09-18 08:32:10 ERROR [payment-service] Connection timeout to database after 45000ms
+2026-09-18 08:40:03 ERROR [reporting-service] NullPointerException at ReportGenerator.build line 128
+2026-09-18 08:41:19 ERROR [auth-service] Invalid token signature for request id 55321
+2026-09-18 08:42:00 WARN [payment-service] Slow query detected: 2100ms
+2026-09-18 08:45:33 ERROR [payment-service] Connection timeout to database after 30500ms
+2026-09-18 08:50:12 ERROR [auth-service] Invalid token signature for request id 55402
+2026-09-18 08:52:44 INFO [reporting-service] Report generated successfully
+2026-09-18 08:55:01 ERROR [reporting-service] NullPointerException at ReportGenerator.build line 128
+2026-09-18 09:01:18 WARN [payment-service] Connection pool usage at 85%
+2026-09-18 09:03:29 ERROR [payment-service] Connection timeout to database after 31000ms
+2026-09-18 09:10:44 INFO [auth-service] User f9e8d7c6-b5a4-3210-fedc-ba9876543210 logged in
+2026-09-18 09:12:55 ERROR [auth-service] Invalid token signature for request id 55488

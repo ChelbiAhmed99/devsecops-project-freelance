@@ -1,0 +1,153 @@
+name: CI/CD DevSecOps
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/assistant-devsecops
+
+jobs:
+  backend:
+    name: Backend (tests + couverture + OWASP)
+    runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17', cache: maven }
+      - name: Tests et couverture JaCoCo
+        working-directory: backend
+        # Les échecs sont remontés à l'Assistant ; la décision finale revient à la quality gate.
+        run: mvn -B verify -Dmaven.test.failure.ignore=true
+      - name: OWASP Dependency-Check
+        working-directory: backend
+        continue-on-error: true
+        env: { NVD_API_KEY: '${{ secrets.NVD_API_KEY }}' }
+        run: mvn -B org.owasp:dependency-check-maven:check -Dformat=JSON
+      - name: SonarQube (si configuré)
+        if: ${{ env.SONAR_TOKEN != '' }}
+        working-directory: backend
+        env:
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: mvn -B sonar:sonar -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.token=$SONAR_TOKEN
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-reports
+          path: |
+            backend/target/surefire-reports/*.xml
+            backend/target/site/jacoco/jacoco.xml
+            backend/target/dependency-check-report.json
+
+  ia-service:
+    name: Service IA (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12', cache: pip, cache-dependency-path: ia-service/requirements-dev.txt }
+      - working-directory: ia-service
+        run: |
+          pip install -r requirements-dev.txt
+          pytest -q --junitxml=pytest-report.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: ia-reports, path: ia-service/pytest-report.xml }
+
+  frontend:
+    name: Frontend (tests + build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22', cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - working-directory: frontend
+        run: |
+          npm ci
+          npm test
+          npm run build
+
+  images:
+    name: Images Docker + scan Trivy
+    needs: [backend, ia-service, frontend]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        component: [backend, ia-service, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: ./${{ matrix.component }}
+          load: true
+          tags: ${{ env.IMAGE_PREFIX }}-${{ matrix.component }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Scan Trivy
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: ${{ env.IMAGE_PREFIX }}-${{ matrix.component }}:${{ github.sha }}
+          format: json
+          output: trivy-${{ matrix.component }}.json
+          severity: CRITICAL,HIGH,MEDIUM,LOW
+      - uses: actions/upload-artifact@v4
+        with: { name: 'trivy-${{ matrix.component }}', path: 'trivy-${{ matrix.component }}.json' }
+      - name: Push (branche main)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker push ${{ env.IMAGE_PREFIX }}-${{ matrix.component }}:${{ github.sha }}
+
+  publish:
+    name: Publication vers l'Assistant + quality gate
+    needs: [backend, ia-service, frontend, images]
+    # always() : on publie aussi les résultats d'un pipeline en échec (c'est là qu'ils sont utiles)
+    if: ${{ always() && vars.ASSISTANT_URL != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { path: artifacts }
+      - name: Regrouper les rapports
+        run: |
+          mkdir -p backend/target/surefire-reports backend/target/site/jacoco
+          cp artifacts/backend-reports/surefire-reports/*.xml backend/target/surefire-reports/ 2>/dev/null || true
+          cp artifacts/backend-reports/site/jacoco/jacoco.xml backend/target/site/jacoco/ 2>/dev/null || true
+          cp artifacts/backend-reports/dependency-check-report.json backend/target/ 2>/dev/null || true
+          cp artifacts/trivy-backend/trivy-backend.json trivy-report.json 2>/dev/null || true
+      - name: Publier et vérifier la quality gate
+        env:
+          ASSISTANT_URL: ${{ vars.ASSISTANT_URL }}
+          ASSISTANT_API_KEY: ${{ secrets.ASSISTANT_API_KEY }}
+          BRANCH: ${{ github.ref_name }}
+          COMMIT_SHA: ${{ github.sha }}
+          PIPELINE_ID: ${{ github.run_id }}
+        run: ./scripts/ci/publish-results.sh
+
+  deploy:
+    name: Déploiement (environnement de démonstration)
+    needs: [publish]
+    if: github.ref == 'refs/heads/main' && vars.DEPLOY_HOST != ''
+    runs-on: ubuntu-latest
+    environment: demo
+    steps:
+      - uses: actions/checkout@v4
+      - name: Déployer via SSH (docker compose)
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          HOST: ${{ vars.DEPLOY_HOST }}
+        run: |
+          install -m 600 /dev/null key && echo "$SSH_KEY" > key
+          scp -i key -o StrictHostKeyChecking=accept-new docker-compose.yml "deploy@$HOST:~/assistant/"
+          ssh -i key "deploy@$HOST" "cd ~/assistant && IMAGE_TAG=${{ github.sha }} docker compose pull && IMAGE_TAG=${{ github.sha }} docker compose up -d"

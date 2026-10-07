@@ -1,0 +1,230 @@
+<div class="page-header">
+  <div>
+    <p class="eyebrow">Brique 2</p>
+    <h1>Tests automatisés</h1>
+    <p class="page-header__lead">Résultats des tests du projet, couverture de code, tests instables et lien avec les erreurs de logs.</p>
+  </div>
+  <div class="actions">
+    <button class="btn" type="button" (click)="load()">Actualiser</button>
+    <button class="btn btn--primary" type="button" [disabled]="running() || !canRun()" (click)="run()"
+            [title]="canRun() ? 'Exécute mvn test sur le projet analysé' : 'Maven ou le projet est indisponible sur le serveur : importez des rapports en bas de page'">
+      @if (running()) { <span class="spinner spinner--sm"></span> Exécution en cours… } @else { Lancer les tests }
+    </button>
+  </div>
+</div>
+
+<details class="help" [open]="!hasResults()">
+  <summary>Comment fonctionne cet écran ?</summary>
+  <div class="help__body">
+    <p>Cet écran n'écrit pas de tests : il <strong>récupère les résultats</strong> des tests existants du projet, les conserve
+      dans un historique et les analyse. Les résultats peuvent arriver de trois façons :</p>
+    <ol class="steps">
+      <li><strong>Lancer les tests</strong> — le serveur exécute <code>mvn test</code> sur le projet analysé, puis lit les
+        rapports produits (<code>target/surefire-reports</code>) et la couverture JaCoCo. Durée : 1 à 3 min.</li>
+      <li><strong>Importer des rapports</strong> (bas de page) — vous déposez les fichiers <code>TEST-*.xml</code> produits
+        ailleurs (poste de développement, autre projet Java, Jest, pytest, Cypress…). Aucun outil requis sur le serveur.</li>
+      <li><strong>Pipeline CI/CD</strong> — à chaque build, le pipeline publie ses rapports sur
+        <code>POST /api/ci/tests</code>. C'est le mode normal en équipe : l'historique se remplit tout seul.</li>
+    </ol>
+    <p>Chaque arrivée crée une <strong>exécution</strong> numérotée (#1, #2…). L'écran affiche la dernière ; cliquez sur un
+      numéro sous la courbe pour consulter une exécution plus ancienne.</p>
+    <app-tool-status [tools]="tools()" [keys]="['maven', 'project']" />
+  </div>
+</details>
+
+@if (!canRun()) {
+  <div class="alert alert--warn">
+    <strong>Le lancement depuis l'interface est indisponible sur ce serveur.</strong>
+    <app-tool-status [tools]="tools()" [keys]="['maven', 'project']" />
+    Vous pouvez toujours importer des rapports JUnit en bas de page.
+  </div>
+}
+
+@if (running()) {
+  <div class="job-banner" role="status">
+    <span class="spinner"></span>
+    <div>
+      <strong>Exécution des tests en cours — {{ elapsedLabel() }}</strong>
+      <p class="muted">Maven compile le projet puis exécute les tests. Comptez 1 à 3 minutes (davantage au tout premier
+        lancement, le temps de télécharger les dépendances). Les résultats s'afficheront ici automatiquement.</p>
+    </div>
+  </div>
+}
+
+@if (job(); as j) {
+  @if (j.status === 'FAILED') {
+    <div class="alert alert--error">
+      <strong>La dernière exécution n'a pas abouti.</strong>
+      Les résultats affichés ci-dessous sont ceux de l'exécution précédente.
+      <pre class="code-block">{{ j.message }}</pre>
+    </div>
+  }
+}
+
+@if (viewingOld()) {
+  <div class="alert alert--info">
+    Vous consultez une ancienne exécution (#{{ summary()?.runId }}).
+    <button class="link" type="button" (click)="load()">Revenir à la dernière →</button>
+  </div>
+}
+
+@if (summary(); as s) {
+  @if (s.totalTests > 0) {
+    <section class="grid grid--4">
+      <div class="panel stat" title="Nombre total de cas de test de cette exécution"><span class="stat__value">{{ s.totalTests }}</span><span class="stat__label">tests exécutés · {{ s.totalSkipped }} ignoré(s)</span></div>
+      <div class="panel stat" [class.panel--critical]="failed() > 0" title="Échecs (assertion fausse) + erreurs (exception inattendue)">
+        <span class="stat__value">{{ failed() }}</span><span class="stat__label">en échec ({{ s.totalFailures }} échec(s) · {{ s.totalErrors }} erreur(s))</span></div>
+      <div class="panel stat" [class.panel--high]="s.successRatePercent < 95" title="Tests réussis / tests exécutés (hors tests ignorés)">
+        <span class="stat__value">{{ s.successRatePercent }}%</span><span class="stat__label">de réussite</span>
+        <div class="progress"><div class="progress__bar" [style.width.%]="s.successRatePercent"></div></div>
+      </div>
+      <div class="panel stat" title="Part des lignes de code exécutées par les tests (rapport JaCoCo)">
+        <span class="stat__value">{{ s.lineCoverage ?? '—' }}{{ s.lineCoverage !== null ? '%' : '' }}</span>
+        <span class="stat__label">couverture lignes{{ s.branchCoverage !== null ? ' · branches ' + s.branchCoverage + '%' : '' }}{{ s.lineCoverage === null ? ' (aucun rapport JaCoCo fourni)' : '' }}</span>
+        @if (s.lineCoverage !== null) { <div class="progress"><div class="progress__bar progress__bar--alt" [style.width.%]="s.lineCoverage"></div></div> }
+      </div>
+    </section>
+
+    <div class="run-meta">
+      <p class="muted">
+        Exécution {{ s.runId ? '#' + s.runId : '' }} · {{ s.executedAt | dt }} · {{ triggerLabel(s.trigger) }}
+        {{ s.branch ? '· branche ' + s.branch : '' }}{{ s.commitSha ? ' · commit ' + s.commitSha.slice(0, 8) : '' }}
+        · durée {{ s.durationSeconds.toFixed(1) }} s
+      </p>
+      @if (!viewingOld() && gate().length) {
+        <div class="gate-strip" title="Seuils de la quality gate appliqués à la dernière exécution">
+          @for (c of gate(); track c.name) {
+            <span class="badge badge--{{ c.passed ? 'ok' : 'critical' }}">{{ c.name }} : {{ c.actual }} (seuil {{ c.threshold }})</span>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  <section class="grid grid--2">
+    <div class="panel">
+      <h2>Tendance</h2>
+      <p class="muted">Évolution du taux de réussite et de la couverture au fil des exécutions.</p>
+      @if (history().length > 1) {
+        <app-line-chart [series]="trendSeries()" [labels]="trendLabels()" ariaLabel="Taux de réussite et couverture par exécution" />
+      } @else { <p class="empty">Au moins deux exécutions sont nécessaires pour tracer une tendance.</p> }
+      @if (history().length) {
+        <p class="muted run-chips__label">Historique — cliquez pour consulter une exécution (rouge = au moins un échec) :</p>
+        <div class="run-chips">
+          @for (h of history(); track h.runId) {
+            <button type="button" class="chip chip--{{ h.failed > 0 ? 'ko' : 'ok' }}" [class.active]="h.runId === s.runId"
+                    (click)="loadRun(h.runId)" [title]="(h.executedAt | dt) + ' · ' + triggerLabel(h.trigger) + ' · ' + h.failed + ' échec(s) / ' + h.total">#{{ h.runId }}</button>
+          }
+        </div>
+      }
+    </div>
+
+    <div class="panel">
+      <h2>Tests instables (flaky)</h2>
+      <p class="muted">Tests qui ont alterné entre succès et échec sur les 10 dernières exécutions : à fiabiliser, car ils
+        font échouer le pipeline de façon aléatoire.</p>
+      <table class="table">
+        <thead><tr><th>Test</th><th title="Nombre d'échecs / exécutions observées">Échecs</th><th title="Changements d'état / exécutions">Instabilité</th><th>Dernier</th></tr></thead>
+        <tbody>
+          @for (f of flaky(); track f.suiteName + f.testName) {
+            <tr>
+              <td><strong>{{ f.testName }}</strong><br /><span class="muted">{{ shortName(f.suiteName) }}</span></td>
+              <td class="mono">{{ f.failures }}/{{ f.runsObserved }}</td>
+              <td><div class="progress"><div class="progress__bar progress__bar--warn" [style.width.%]="f.flakinessPercent"></div></div>
+                <span class="mono muted">{{ f.flakinessPercent }}%</span></td>
+              <td><span class="badge badge--{{ f.lastStatus === 'PASSED' ? 'ok' : 'critical' }}">{{ f.lastStatus | lbl }}</span></td>
+            </tr>
+          } @empty {
+            <tr><td colspan="4" class="empty">Aucun test instable détecté.</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel__header">
+      <h2>Suites de tests</h2>
+      <label class="checkbox"><input type="checkbox" [checked]="onlyFailures()" (change)="onlyFailures.set(!onlyFailures())" /> Échecs uniquement</label>
+    </div>
+    <p class="muted">Une suite = une classe de test. Cliquez sur une suite pour voir chaque test, son message d'échec et sa trace.</p>
+    @for (suite of suites(); track suite.suiteName) {
+      <div class="suite">
+        <button type="button" class="suite__header" (click)="toggleSuite(suite.suiteName)" [attr.aria-expanded]="expandedSuite() === suite.suiteName">
+          <span class="status-dot status-dot--{{ suite.failures + suite.errors > 0 ? 'down' : 'up' }}"></span>
+          <strong [title]="suite.suiteName">{{ shortName(suite.suiteName) }}</strong>
+          <span class="muted">{{ suite.tests }} tests · {{ suite.failures + suite.errors }} échec(s) · {{ suite.skipped }} ignoré(s) · {{ suite.timeSeconds.toFixed(2) }} s</span>
+          <span class="suite__chevron">{{ expandedSuite() === suite.suiteName ? '▾' : '▸' }}</span>
+        </button>
+        @if (expandedSuite() === suite.suiteName) {
+          <ul class="testcases">
+            @for (tc of suite.testCases; track tc.name) {
+              <li>
+                <span class="badge badge--{{ tc.status === 'PASSED' ? 'ok' : tc.status === 'SKIPPED' ? 'low' : 'critical' }}">{{ tc.status | lbl }}</span>
+                <span class="mono">{{ tc.name }}</span>
+                <span class="muted">{{ tc.timeSeconds }} s</span>
+                @if (tc.status === 'FAILED' || tc.status === 'ERROR') {
+                  <button class="btn btn--sm" type="button" (click)="explainTestCase(suite.suiteName, tc)">Expliquer (IA)</button>
+                }
+                @if (tc.failureMessage) { <div class="testcase__msg">{{ tc.failureMessage }}</div> }
+                @if (tc.stackTrace) { <pre class="code-block">{{ tc.stackTrace }}</pre> }
+              </li>
+            }
+          </ul>
+        }
+      </div>
+    } @empty {
+      <p class="empty">
+        @if (onlyFailures() && hasResults()) { Aucune suite en échec dans cette exécution. }
+        @else { Aucun résultat pour le moment : lancez les tests ou importez des rapports JUnit ci-dessous. }
+      </p>
+    }
+  </section>
+}
+
+<section class="panel">
+  <h2>Échecs corrélés aux logs</h2>
+  <p class="muted">Pour chaque test en échec, l'assistant recherche dans les logs les erreurs et avertissements qui lui
+    ressemblent le plus (mots communs avec le nom du test et le message d'échec), en priorité ceux émis pendant
+    l'exécution. Le bouton « Expliquer (IA) » envoie l'échec et ces logs à l'assistant IA.</p>
+  @for (f of correlated(); track f.suiteName + f.testCaseName) {
+    <div class="correlation">
+      <div class="correlation__header">
+        <div>
+          <strong>{{ shortName(f.suiteName) }} › {{ f.testCaseName }}</strong>
+          <p class="testcase__msg">{{ f.failureMessage }}</p>
+        </div>
+        <button class="btn btn--sm btn--primary" type="button" (click)="explainFailure(f)">Expliquer (IA)</button>
+      </div>
+      <p class="muted">{{ f.correlationNote }}</p>
+      @for (l of f.relatedLogs; track $index) {
+        <div class="log-line"><span class="muted mono">{{ l.timestamp | dt }}</span>
+          <span class="badge badge--{{ l.level | sev }}">{{ l.level }}</span><span class="mono">[{{ l.source }}] {{ l.message }}</span></div>
+      }
+    </div>
+  } @empty {
+    <p class="empty">Aucun test en échec dans cette exécution : rien à corréler.</p>
+  }
+</section>
+
+<section class="panel">
+  <h2>Importer des rapports</h2>
+  <p class="muted">Rapports au format JUnit XML (Maven Surefire/Failsafe, Gradle, Jest-junit, pytest <code>--junitxml</code>, Cypress…).
+    Avec Maven, ils se trouvent dans <code>target/surefire-reports/TEST-*.xml</code> après <code>mvn test</code> ;
+    la couverture dans <code>target/site/jacoco/jacoco.xml</code>. Chaque import crée une nouvelle exécution dans l'historique.</p>
+  <div class="import-row">
+    <label class="dropzone dropzone--inline"><input #reportsInput type="file" accept=".xml" multiple (change)="onReports($event)" /><span>1. Rapports JUnit (.xml) — plusieurs fichiers possibles</span></label>
+    <label class="dropzone dropzone--inline"><input #coverageInput type="file" accept=".xml" (change)="onCoverage($event)" /><span>2. jacoco.xml (optionnel)</span></label>
+    <button class="btn btn--primary" type="button" [disabled]="importing() || !reportNames().length" (click)="importReports(reportsInput, coverageInput)">{{ importing() ? 'Import…' : '3. Importer' }}</button>
+  </div>
+  @if (reportNames().length || coverageName()) {
+    <p class="file-list">
+      @if (reportNames().length) { <strong>{{ reportNames().length }} rapport(s) :</strong> {{ reportNames().slice(0, 6).join(', ') }}{{ reportNames().length > 6 ? '…' : '' }} }
+      @if (coverageName()) { <strong> · couverture :</strong> {{ coverageName() }} }
+    </p>
+  }
+</section>
+
+@if (explain(); as req) {
+  <app-explain-dialog [request]="req" (closed)="explain.set(null)" />
+}

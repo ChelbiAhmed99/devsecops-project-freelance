@@ -1,0 +1,31 @@
+# Backend (Maven/Java)
+backend/target/
+backend/data/
+*.class
+hs_err_pid*.log
+
+# Service IA (Python)
+__pycache__/
+*.pyc
+.pytest_cache/
+ia-service/venv/
+ia-service/.venv/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+
+# Secrets / environnement (ne JAMAIS committer de clé)
+.env
+.env.*
+!.env.example
+**/.env.txt
+
+# IDE / OS
+.idea/
+*.iml
+.vscode/*
+!frontend/.vscode/
+.DS_Store
+data/

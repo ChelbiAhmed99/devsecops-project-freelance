@@ -1,0 +1,106 @@
+<div class="page-header">
+  <div>
+    <p class="eyebrow">Brique 4</p>
+    <h1>Assistant IA</h1>
+  </div>
+  @if (health(); as h) {
+    <span class="ai-status">
+      <span class="status-dot status-dot--{{ h.status === 'UP' ? 'up' : 'down' }}"></span>
+      Service IA {{ h.status === 'UP' ? 'disponible' : 'indisponible' }}
+      @if (h.provider) { · <code>{{ h.provider }}</code> {{ h.model }} }
+    </span>
+  }
+</div>
+
+<details class="help">
+  <summary>Comment fonctionne l'assistant IA ?</summary>
+  <div class="help__body">
+    <p><strong>Copilote</strong> : posez une question en français. À chaque question, l'assistant reçoit un résumé à jour du
+      projet (anomalies de logs, derniers tests, vulnérabilités ouvertes) et répond à partir de ces données.</p>
+    <p><strong>Recommandations</strong> : chaque clic sur « Expliquer (IA) » dans les écrans Logs, Tests ou Sécurité crée ici
+      une fiche (cause probable, correction proposée, gravité) au statut « À valider ». Un humain doit la
+      <strong>valider</strong> ou la <strong>rejeter</strong>, avec un commentaire facultatif : c'est la trace que la
+      proposition de l'IA a été relue avant d'être appliquée. Redemander une explication pour le même incident réutilise
+      la fiche existante.</p>
+    <p class="muted">Le fournisseur affiché en haut à droite indique le moteur utilisé : <code>groq</code> (modèle de langage,
+      si une clé d'API est configurée) ou <code>heuristic</code> (règles locales, sans connexion externe).</p>
+  </div>
+</details>
+
+<nav class="tabs" role="tablist">
+  <button role="tab" type="button" [class.active]="tab() === 'copilot'" (click)="tab.set('copilot')">Copilote</button>
+  <button role="tab" type="button" [class.active]="tab() === 'recommendations'" (click)="tab.set('recommendations')">
+    Recommandations @if (counts().pending) { <span class="count">{{ counts().pending }}</span> }
+  </button>
+</nav>
+
+@if (tab() === 'copilot') {
+  <section class="panel chat">
+    <div class="chat__log" #chatLog>
+      @if (!messages().length) {
+        <div class="chat__intro">
+          <h2>Posez une question sur l'état du projet</h2>
+          <p class="muted">Le copilote s'appuie sur un instantané en temps réel des anomalies de logs, des résultats de tests
+            et des vulnérabilités ouvertes. Ses réponses sont des aides à la décision : validez-les avant d'agir.</p>
+          <div class="chips">
+            @for (s of suggestions; track s) { <button type="button" class="chip" (click)="ask(s)">{{ s }}</button> }
+          </div>
+        </div>
+      }
+      @for (m of messages(); track $index) {
+        <div class="bubble bubble--{{ m.role }}">
+          <div class="bubble__content">{{ m.content }}</div>
+          @if (m.provider) { <div class="bubble__meta">{{ m.provider }}</div> }
+        </div>
+      }
+      @if (thinking()) {
+        <div class="bubble bubble--assistant"><span class="typing"><i></i><i></i><i></i></span></div>
+      }
+    </div>
+    <form class="chat__input" (ngSubmit)="ask()">
+      <input type="text" name="question" [(ngModel)]="question" placeholder="Ex. : que dois-je corriger avant la mise en production ?"
+             autocomplete="off" [disabled]="thinking()" />
+      <button class="btn btn--primary" type="submit" [disabled]="thinking() || !question.trim()">Envoyer</button>
+      @if (messages().length) { <button class="btn btn--ghost" type="button" (click)="resetChat()">Effacer</button> }
+    </form>
+  </section>
+} @else {
+  <div class="toolbar">
+    <div class="segmented" role="group" aria-label="Filtre de statut">
+      <button type="button" [class.active]="statusFilter() === 'PENDING_REVIEW'" (click)="statusFilter.set('PENDING_REVIEW')">À valider ({{ counts().pending }})</button>
+      <button type="button" [class.active]="statusFilter() === 'APPROVED'" (click)="statusFilter.set('APPROVED')">Validées ({{ counts().approved }})</button>
+      <button type="button" [class.active]="statusFilter() === 'REJECTED'" (click)="statusFilter.set('REJECTED')">Rejetées ({{ counts().rejected }})</button>
+      <button type="button" [class.active]="statusFilter() === ''" (click)="statusFilter.set('')">Toutes</button>
+    </div>
+    <button class="btn" type="button" (click)="loadRecommendations()">Actualiser</button>
+  </div>
+
+  @for (r of filtered(); track r.id) {
+    <article class="panel rec-card panel--{{ r.status === 'APPROVED' ? 'ok' : r.status === 'REJECTED' ? 'low' : 'medium' }}">
+      <header class="rec-card__header">
+        <div>
+          <span class="badge badge--outline">{{ typeLabel(r.incidentType) }}</span>
+          <span class="badge badge--{{ r.status === 'APPROVED' ? 'ok' : r.status === 'REJECTED' ? 'critical' : 'medium' }}">{{ r.status | lbl }}</span>
+          <span class="muted">{{ r.source }} · {{ r.createdAt | relative }} · par {{ r.createdBy }} · {{ r.provider }}</span>
+        </div>
+      </header>
+      <p class="mono rec-card__incident">{{ r.incidentSummary }}</p>
+      <div class="grid grid--2">
+        <div><h3>Cause probable</h3><p>{{ r.explanation }}</p>
+          <h3>Gravité</h3><p>{{ r.severityAssessment }}</p></div>
+        <div><h3>Correction proposée</h3><pre class="rec__fix">{{ r.suggestedFix }}</pre></div>
+      </div>
+      @if (r.status === 'PENDING_REVIEW') {
+        <div class="review-row">
+          <input type="text" [(ngModel)]="comments[r.id]" placeholder="Commentaire (optionnel)" aria-label="Commentaire" />
+          <button class="btn btn--primary" type="button" (click)="review(r, 'APPROVED')">Valider</button>
+          <button class="btn" type="button" (click)="review(r, 'REJECTED')">Rejeter</button>
+        </div>
+      } @else {
+        <p class="muted">{{ r.status | lbl }} par {{ r.reviewedBy }} {{ r.reviewedAt | relative }}{{ r.reviewComment ? ' — « ' + r.reviewComment + ' »' : '' }}</p>
+      }
+    </article>
+  } @empty {
+    <p class="empty">Aucune recommandation dans cette catégorie. Demandez une explication depuis les écrans Logs, Tests ou Sécurité.</p>
+  }
+}

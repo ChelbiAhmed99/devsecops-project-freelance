@@ -1,0 +1,75 @@
+# Pipeline GitLab CI équivalent au workflow GitHub Actions.
+# Variables CI/CD à définir : ASSISTANT_URL, ASSISTANT_API_KEY (masquée), NVD_API_KEY (optionnelle),
+# SONAR_HOST_URL / SONAR_TOKEN (optionnelles).
+stages: [test, security, package, publish]
+
+variables:
+  MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2"
+  IMAGE_PREFIX: $CI_REGISTRY_IMAGE
+
+cache:
+  key: $CI_COMMIT_REF_SLUG
+  paths: [.m2/, frontend/node_modules/]
+
+backend:test:
+  stage: test
+  image: maven:3.9-eclipse-temurin-17
+  script: [cd backend, mvn -B verify]
+  artifacts:
+    when: always
+    paths: [backend/target/surefire-reports/, backend/target/site/jacoco/jacoco.xml]
+    reports:
+      junit: backend/target/surefire-reports/TEST-*.xml
+
+ia:test:
+  stage: test
+  image: python:3.12-slim
+  script:
+    - cd ia-service && pip install -q -r requirements-dev.txt
+    - pytest -q --junitxml=pytest-report.xml
+  artifacts:
+    when: always
+    reports: { junit: ia-service/pytest-report.xml }
+
+frontend:build:
+  stage: test
+  image: node:22-alpine
+  script: [cd frontend, npm ci, npm test, npm run build]
+
+dependency-check:
+  stage: security
+  image: maven:3.9-eclipse-temurin-17
+  allow_failure: true
+  script: [cd backend, mvn -B org.owasp:dependency-check-maven:check -Dformat=JSON]
+  artifacts:
+    when: always
+    paths: [backend/target/dependency-check-report.json]
+
+sonarqube:
+  stage: security
+  image: maven:3.9-eclipse-temurin-17
+  rules: [{ if: '$SONAR_TOKEN' }]
+  script: [cd backend, mvn -B verify sonar:sonar -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.token=$SONAR_TOKEN]
+
+images:
+  stage: package
+  image: docker:27
+  services: [docker:27-dind]
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - for c in backend ia-service frontend; do docker build -t $IMAGE_PREFIX/$c:$CI_COMMIT_SHORT_SHA ./$c; done
+    - docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.56.2 image --format json --quiet $IMAGE_PREFIX/backend:$CI_COMMIT_SHORT_SHA > trivy-report.json
+    - if [ "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH" ]; then for c in backend ia-service frontend; do docker push $IMAGE_PREFIX/$c:$CI_COMMIT_SHORT_SHA; done; fi
+  artifacts:
+    paths: [trivy-report.json]
+
+publish:assistant:
+  stage: publish
+  image: alpine:3.20
+  rules: [{ if: '$ASSISTANT_URL' }]
+  before_script: [apk add --no-cache bash curl]
+  variables:
+    BRANCH: $CI_COMMIT_REF_NAME
+    COMMIT_SHA: $CI_COMMIT_SHA
+    PIPELINE_ID: $CI_PIPELINE_ID
+  script: [./scripts/ci/publish-results.sh]

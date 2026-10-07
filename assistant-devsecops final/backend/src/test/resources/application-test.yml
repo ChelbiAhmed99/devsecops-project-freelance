@@ -1,0 +1,18 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:assistant-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+
+assistant:
+  demo:
+    enabled: false
+  ci:
+    api-key: test-ci-key
+  security:
+    sonar:
+      enabled: false
+  ai:
+    service-url: http://localhost:1
+    timeout-seconds: 2
