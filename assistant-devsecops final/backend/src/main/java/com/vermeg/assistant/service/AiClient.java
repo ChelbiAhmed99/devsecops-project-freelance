@@ -51,13 +51,14 @@ public class AiClient {
     public record Outlier(String bucket, double score) { }
 
     public AiExplanationResult explain(String incidentType, String source, String message,
-                                       Integer occurrences, String extraContext) {
+                                       Integer occurrences, String extraContext, boolean regenerate) {
         Map<String, Object> body = new HashMap<>();
         body.put("incident_type", incidentType);
         body.put("source", source);
         body.put("message", message);
         body.put("occurrences", occurrences);
         body.put("extra_context", extraContext);
+        body.put("regenerate", regenerate);
         try {
             HttpResponse<String> response = post("/explain", body, timeoutSeconds);
             if (response.statusCode() != 200) {

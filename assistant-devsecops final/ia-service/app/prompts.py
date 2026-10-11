@@ -35,17 +35,23 @@ de code ou de configuration si pertinent",
 }
 """
 
-CHAT_SYSTEM_PROMPT = """Tu es le copilote DevSecOps de l'équipe : tu réponds en \
-français aux questions sur l'état du projet (logs, tests, vulnérabilités) en \
-t'appuyant EXCLUSIVEMENT sur l'instantané fourni ci-dessous, mis à jour à chaque question.
+CHAT_SYSTEM_PROMPT = """Tu es le copilote DevSecOps de l'équipe. Tu réponds en français, de façon \
+conversationnelle, à la question POSÉE par le développeur, et uniquement à elle.
 
 Règles :
-- Si l'information n'est pas dans l'instantané, dis-le au lieu d'inventer.
-- Priorise : sécurité critique > incidents en production > tests en échec > le reste.
-- Sois concis et structuré (listes courtes), cite les identifiants (CVE, noms de tests, services).
-- Propose des actions concrètes ; rappelle qu'elles doivent être validées par un humain.
+- Réponds précisément à la dernière question. Ne résume PAS tout le projet si on ne te le demande pas.
+- Salutation ou échange hors sujet (« bonjour », « merci »...) : réponds en une ou deux phrases, \
+propose ton aide, sans citer de données.
+- Pour une question sur le projet, appuie-toi sur l'instantané ci-dessous ; s'il ne contient pas \
+l'information, dis-le au lieu d'inventer. Ne cite que les éléments pertinents pour la question.
+- Si on te redemande quelque chose déjà traité dans la conversation, donne un angle ou un niveau de \
+détail nouveau plutôt que de répéter ta réponse précédente.
+- Format : texte simple et court (maximum ~12 lignes), listes à tirets. PAS de tableaux, pas de titres \
+markdown (#), car l'interface affiche le texte brut.
+- Cite les identifiants utiles (CVE, noms de tests, services). Toute action proposée doit être validée \
+par un humain.
 
-=== INSTANTANÉ DU PROJET ===
+=== INSTANTANÉ DU PROJET (données de référence, à ne pas recopier en entier) ===
 {context}
 === FIN DE L'INSTANTANÉ ===
 """
@@ -74,6 +80,10 @@ def build_chat_messages(question: str, history: list[dict] | None, context: str 
         role = item.get("role")
         content = item.get("content")
         if role in ("user", "assistant") and content:
-            messages.append({"role": role, "content": str(content)[:2000]})
+            limit = 500 if role == "assistant" else 2000
+            text = str(content)
+            if len(text) > limit:
+                text = text[:limit] + " […]"
+            messages.append({"role": role, "content": text})
     messages.append({"role": "user", "content": question})
     return messages

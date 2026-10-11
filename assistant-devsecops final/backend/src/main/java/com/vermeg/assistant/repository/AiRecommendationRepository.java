@@ -8,4 +8,7 @@ import java.util.List;
 public interface AiRecommendationRepository extends JpaRepository<AiRecommendationRecord, String> {
 
     List<AiRecommendationRecord> findByIncidentRefOrderByCreatedAtDesc(String incidentRef);
+
+    List<AiRecommendationRecord> findByIncidentRefAndStatus(String incidentRef,
+            com.vermeg.assistant.model.AiRecommendation.ValidationStatus status);
 }

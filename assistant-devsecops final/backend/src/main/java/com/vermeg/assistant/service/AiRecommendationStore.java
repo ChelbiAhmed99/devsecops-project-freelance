@@ -50,6 +50,14 @@ public class AiRecommendationStore {
                 .findFirst();
     }
 
+    /** Supprime les fiches encore « À valider » d'un incident (utilisé lors d'une régénération). */
+    @Transactional
+    public void deletePendingByIncidentRef(String incidentRef) {
+        if (incidentRef == null || incidentRef.isBlank()) return;
+        repository.deleteAll(repository.findByIncidentRefAndStatus(incidentRef,
+                AiRecommendation.ValidationStatus.PENDING_REVIEW));
+    }
+
     @Transactional
     public boolean updateStatus(String id, AiRecommendation.ValidationStatus status) {
         return review(id, status, null, null);

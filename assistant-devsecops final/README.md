@@ -20,6 +20,19 @@ Prérequis : Docker Desktop (ou Docker Engine + Compose) et un accès Internet p
 cp .env.example .env        # puis renseigner au minimum JWT_SECRET (openssl rand -base64 48)
 docker compose up -d --build
 ```
+                                        if fails executer ca "
+
+                                        docker rmi -f maven:3.9-eclipse-temurin-17
+                                        docker builder prune -af
+                                        docker pull maven:3.9-eclipse-temurin-17
+                                        docker compose build --no-cache backend
+                                        docker compose up -d --build
+
+
+                                        docker compose build --progress=plain ia-service
+
+
+
 
 Ouvrir <http://localhost:4200>. Le premier build prend plusieurs minutes.
 

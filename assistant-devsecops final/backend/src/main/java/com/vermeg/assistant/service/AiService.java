@@ -59,7 +59,7 @@ public class AiService {
             }
         }
         AiClient.AiExplanationResult result = aiClient.explain(type, request.source(), request.message(),
-                request.occurrences(), request.extraContext());
+                request.occurrences(), request.extraContext(), Boolean.TRUE.equals(request.force()));
         if (!result.success()) {
             throw new AiUnavailableException(result.errorMessage());
         }
@@ -71,6 +71,10 @@ public class AiService {
         recommendation.setProvider(result.provider());
         recommendation.setModel(result.model());
         recommendation.setCreatedBy(CurrentUser.username());
+        if (Boolean.TRUE.equals(request.force())) {
+            // Régénération : la nouvelle fiche remplace l'ancienne en attente (les fiches déjà revues sont conservées)
+            store.deletePendingByIncidentRef(request.incidentRef());
+        }
         store.save(recommendation);
         auditService.record("AI_EXPLAIN", type + (request.incidentRef() == null ? "" : " " + request.incidentRef()),
                 "fournisseur=" + result.provider());
@@ -106,7 +110,7 @@ public class AiService {
                 .filter(m -> m.role() != null && m.content() != null)
                 .skip(Math.max(0, request.history().size() - 10))
                 .map(m -> Map.of("role", "assistant".equals(m.role()) ? "assistant" : "user",
-                        "content", truncate(m.content(), 2000)))
+                        "content", truncate(m.content(), "assistant".equals(m.role()) ? 600 : 2000)))
                 .toList();
         AiClient.ChatResult result = aiClient.chat(truncate(request.question(), 2000), history, buildContext());
         if (!result.success()) {

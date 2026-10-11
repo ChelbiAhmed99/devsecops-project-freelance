@@ -62,7 +62,7 @@ def explain_incident(incident: IncidentRequest):
         try:
             prompt = build_user_prompt(incident.incident_type, incident.source, incident.message,
                                        incident.occurrences, incident.extra_context)
-            parsed = llm.complete_json(SYSTEM_PROMPT, prompt)
+            parsed = llm.complete_json(SYSTEM_PROMPT, prompt, regenerate=incident.regenerate)
             return IncidentExplanation(
                 explanation=str(parsed.get("explanation") or "Explication indisponible."),
                 suggested_fix=str(parsed.get("suggested_fix") or "Aucune piste de correction fournie."),

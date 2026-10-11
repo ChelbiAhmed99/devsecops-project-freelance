@@ -10,6 +10,7 @@ class IncidentRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=8000)
     occurrences: Optional[int] = Field(None, ge=0)
     extra_context: Optional[str] = Field(None, max_length=8000)
+    regenerate: bool = Field(False, description="True : ignorer le cache et produire une nouvelle formulation")
 
 
 class IncidentExplanation(BaseModel):

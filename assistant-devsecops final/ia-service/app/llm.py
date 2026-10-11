@@ -76,6 +76,10 @@ class LruCache:
 
 _cache = LruCache(CACHE_SIZE)
 
+# Les modèles « gpt-oss » acceptent reasoning_effort ; on le limite pour des réponses rapides.
+_REASONING_KWARGS = {"reasoning_effort": os.getenv("ASSISTANT_AI_REASONING", "low")} \
+    if "gpt-oss" in DEFAULT_MODEL else {}
+
 
 def cache_key(*parts) -> str:
     return hashlib.sha256("\x1f".join("" if p is None else str(p) for p in parts).encode("utf-8")).hexdigest()
@@ -95,16 +99,23 @@ def _client():
     return Groq(api_key=api_key(), timeout=45.0, max_retries=2)
 
 
-def complete_json(system_prompt: str, user_prompt: str, model: str = DEFAULT_MODEL) -> dict:
-    """Appelle le LLM et renvoie un dict (explanation, suggested_fix, severity_assessment)."""
+def complete_json(system_prompt: str, user_prompt: str, model: str = DEFAULT_MODEL,
+                  regenerate: bool = False) -> dict:
+    """Appelle le LLM et renvoie un dict (explanation, suggested_fix, severity_assessment).
+
+    regenerate=True : le cache est ignoré et la température relevée, sinon « Régénérer »
+    renverrait indéfiniment la même réponse mise en cache.
+    """
     key = cache_key(model, system_prompt, user_prompt)
-    cached = _cache.get(key)
-    if cached is not None:
-        return cached
+    if not regenerate:
+        cached = _cache.get(key)
+        if cached is not None:
+            return cached
     response = _client().chat.completions.create(
         model=model,
-        max_tokens=1200,
-        temperature=0.2,
+        max_tokens=2500,
+        temperature=0.8 if regenerate else 0.2,
+        **_REASONING_KWARGS,
         messages=[{"role": "system", "content": system_prompt},
                   {"role": "user", "content": user_prompt}],
     )
@@ -114,6 +125,10 @@ def complete_json(system_prompt: str, user_prompt: str, model: str = DEFAULT_MOD
 
 
 def chat(messages: list[dict], model: str = DEFAULT_MODEL) -> str:
+    # max_tokens large : un modèle à raisonnement consomme une partie du budget en réflexion
     response = _client().chat.completions.create(
-        model=model, max_tokens=1200, temperature=0.3, messages=messages)
-    return (response.choices[0].message.content or "").strip()
+        model=model, max_tokens=2500, temperature=0.6, messages=messages, **_REASONING_KWARGS)
+    answer = (response.choices[0].message.content or "").strip()
+    if not answer:
+        raise RuntimeError("Réponse vide du modèle")  # déclenche le repli heuristique côté main.py
+    return answer
