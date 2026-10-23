@@ -1,0 +1,17 @@
+2026-09-18 14:02:11 INFO [payment-service] Payment PAY-77120 authorized in 182ms
+2026-09-18 14:02:40 INFO [payment-gateway] Request processed in 96ms
+2026-09-18 14:05:02 WARN [payment-service] HikariPool-1 - Pool usage at 92% (46/50 connections)
+2026-09-18 14:05:09 ERROR [payment-service] HikariPool-1 - Connection is not available, request timed out after 30000ms
+2026-09-18 14:05:10 ERROR [payment-service] HikariPool-1 - Connection is not available, request timed out after 30000ms
+2026-09-18 14:05:12 ERROR [payment-gateway] Request failed with 503 Service Unavailable for POST /api/payments
+2026-09-18 14:05:14 ERROR [payment-service] HikariPool-1 - Connection is not available, request timed out after 30000ms
+2026-09-18 14:05:15 ERROR [payment-gateway] Request failed with 503 Service Unavailable for POST /api/payments
+2026-09-18 14:05:19 ERROR [payment-service] Transaction rolled back for payment PAY-77131: could not open JDBC connection
+2026-09-18 14:05:23 ERROR [payment-gateway] Request failed with 503 Service Unavailable for POST /api/payments
+2026-09-18 14:05:30 WARN [payment-service] Retry attempt 3 for payment PAY-77134
+2026-09-18 14:07:02 INFO [payment-service] HikariPool-1 - Pool usage back to 38% (19/50 connections)
+2026-09-18 14:07:15 INFO [payment-service] Payment PAY-77140 authorized in 205ms
+2026-09-18 14:21:44 ERROR [auth-service] Invalid JWT signature for client merchant-4412
+2026-09-18 14:21:45 ERROR [auth-service] Invalid JWT signature for client merchant-4412
+2026-09-18 14:21:47 WARN [payment-gateway] 401 Unauthorized returned to merchant-4412
+2026-09-18 14:30:01 INFO [payment-service] Payment PAY-77188 authorized in 177ms

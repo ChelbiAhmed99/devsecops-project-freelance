@@ -6,6 +6,10 @@ export type Severity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
 export type VulnStatus = 'NEW' | 'IN_PROGRESS' | 'FIXED' | 'ACCEPTED_RISK' | 'FALSE_POSITIVE';
 export type ValidationStatus = 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED';
 export type IncidentType = 'log_anomaly' | 'test_failure' | 'vulnerability' | 'other';
+export type LogType = 'APPLICATION' | 'SERVER' | 'CICD';
+export type Criticality = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+export type Verdict = 'VALIDATED' | 'VALIDATED_WITH_RESERVES' | 'REJECTED' | 'INCONCLUSIVE';
+export type FixStatus = 'NONE' | 'APPLIED' | 'VERIFIED' | 'STILL_PRESENT' | 'NOT_ENOUGH_DATA';
 
 export interface UserView {
   id: number;
@@ -40,6 +44,8 @@ export interface LogEntry {
   source: string;
   message: string;
   stackTrace?: string | null;
+  application?: string | null;
+  logType?: LogType | null;
 }
 
 export interface LogPage {
@@ -79,6 +85,9 @@ export interface AnomalyGroup {
   category: string;
   firstSeen: string;
   lastSeen: string;
+  logType?: LogType | null;
+  layers?: LogType[] | null;
+  errorCode?: string | null;
 }
 
 export interface FrequencySpike {
@@ -137,6 +146,7 @@ export interface TestExecutionSummary {
   lineCoverage: number | null;
   branchCoverage: number | null;
   durationSeconds: number;
+  application?: string | null;
 }
 
 export interface TestRunPoint {
@@ -186,6 +196,7 @@ export interface Vulnerability {
   reopened: boolean;
   assignee: string | null;
   note: string | null;
+  applicationCode?: string | null;
 }
 
 export interface VulnerabilityStats {
@@ -249,6 +260,14 @@ export interface AiRecommendation {
   reviewedBy: string | null;
   reviewedAt: string | null;
   reviewComment: string | null;
+  applicationCode?: string | null;
+  fixStatus?: FixStatus | null;
+  appliedBy?: string | null;
+  appliedAt?: string | null;
+  appliedReference?: string | null;
+  verifiedAt?: string | null;
+  verificationDetails?: string | null;
+  diagnostic?: string | null;
 }
 
 export interface ExplainRequest {
@@ -259,6 +278,7 @@ export interface ExplainRequest {
   extraContext?: string | null;
   incidentRef?: string | null;
   force?: boolean;
+  application?: string | null;
 }
 
 export interface ChatMessage {
@@ -340,4 +360,371 @@ export interface ServerEvent {
   title: string;
   data: Record<string, unknown>;
   at: string;
+}
+
+// ------------------------------------------------------------- multi-applications
+export interface ApplicationView {
+  id: number;
+  code: string;
+  name: string;
+  description: string | null;
+  owner: string | null;
+  criticality: Criticality;
+  serverType: string | null;
+  projectPath: string | null;
+  reportsPath: string | null;
+  coveragePath: string | null;
+  logSources: string | null;
+  jiraProjectKey: string | null;
+  repositoryUrl: string | null;
+  policyOverrides: string | null;
+  active: boolean;
+  defaultApplication: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export type ApplicationUpsert = Partial<Omit<ApplicationView, 'id' | 'defaultApplication' | 'createdAt' | 'updatedAt'>>;
+
+// --------------------------------------------------------- diagnostic explicable
+export interface ExplanationFactor {
+  code: string;
+  label: string;
+  value: number;
+  weight: number;
+  contribution: number;
+  detail: string;
+}
+
+export interface IncidentSignal {
+  key: string;
+  message: string;
+  layer: LogType;
+  source: string;
+  level: string;
+  errorCode: string | null;
+  category: string;
+  occurrences: number;
+  firstSeen: string;
+  lastSeen: string;
+  example: string;
+}
+
+export interface RootCauseCandidate {
+  signal: IncidentSignal;
+  score: number;
+  confidencePercent: number;
+  factors: ExplanationFactor[];
+  rule: string | null;
+  rationale: string;
+}
+
+export interface CausalLink {
+  fromKey: string;
+  fromLabel: string;
+  toKey: string;
+  toLabel: string;
+  rule: string;
+  explanation: string;
+}
+
+export interface CorrelatedIncident {
+  id: string;
+  start: string;
+  end: string;
+  severity: string;
+  layers: LogType[];
+  sources: string[];
+  eventCount: number;
+  signals: IncidentSignal[];
+  rootCause: RootCauseCandidate;
+  alternatives: RootCauseCandidate[];
+  chain: CausalLink[];
+  impactedTests: string[];
+  category: string;
+  summary: string;
+}
+
+export interface LogBreakdown {
+  byType: Record<string, number>;
+  byApplication: Record<string, number>;
+}
+
+// ------------------------------------------------------------------- validation
+export interface CriterionResult {
+  code: string;
+  label: string;
+  category: string;
+  status: 'PASS' | 'WARN' | 'FAIL' | 'NO_DATA';
+  score: number;
+  baseWeight: number;
+  effectiveWeight: number;
+  evidenceConfidence: number;
+  blocking: boolean;
+  blockingFailed: boolean;
+  measured: string;
+  threshold: string;
+  justification: string;
+  adaptation: string | null;
+  pointsLost: number;
+}
+
+export interface DecisionStep {
+  rule: string;
+  outcome: string;
+  detail: string;
+}
+
+export interface LlmAssessment {
+  status: 'OK' | 'USED' | 'IGNORED' | 'UNAVAILABLE' | 'DISABLED';
+  opinion: string | null;
+  confidence: number;
+  proposedAdjustment: number;
+  appliedAdjustment: number;
+  allowedAdjustment: number;
+  justification: string | null;
+  risks: string[];
+  recommendations: string[];
+  citedRefs: string[];
+  ungroundedRefs: string[];
+  provider: string | null;
+  model: string | null;
+  note: string | null;
+}
+
+export interface RiskItem {
+  level: string;
+  title: string;
+  detail: string;
+  source: string;
+}
+
+export interface RecommendationItem {
+  priority: number;
+  action: string;
+  rationale: string;
+  source: string;
+  ref: string | null;
+}
+
+export interface TestFailureView {
+  ref: string;
+  suite: string;
+  test: string;
+  status: string;
+  message: string | null;
+  stackExcerpt: string | null;
+  relatedLogs: string[];
+  newFailure: boolean;
+}
+
+export interface AnomalyView {
+  key: string;
+  message: string;
+  level: string;
+  layer: LogType | null;
+  category: string;
+  errorCode: string | null;
+  occurrences: number;
+  critical: boolean;
+  sources: string[];
+  lastSeen: string | null;
+  example: string | null;
+}
+
+export interface ValidationReport {
+  applicationCode: string;
+  applicationName: string;
+  criticality: Criticality;
+  owner: string | null;
+  serverType: string | null;
+  campaignId: number;
+  validationId: number;
+  generatedAt: string;
+  generatedBy: string;
+  mode: string;
+  verdict: Verdict;
+  score: number;
+  baseScore: number;
+  llmAdjustment: number;
+  confidence: number;
+  reviewRequired: boolean;
+  reviewReasons: string[];
+  blockingReasons: string[];
+  criteria: CriterionResult[];
+  trace: DecisionStep[];
+  policy: Record<string, string>;
+  tests: {
+    available: boolean; runId: number | null; executedAt: string | null; trigger: string | null; total: number; failed: number;
+    skipped: number; successRate: number; lineCoverage: number | null; branchCoverage: number | null; durationSeconds: number;
+    ageHours: number; failures: TestFailureView[]; newFailures: string[]; fixedTests: string[]; flaky: FlakyTest[];
+    trend: TestRunPoint[];
+  };
+  logs: {
+    available: boolean; total: number; errors: number; warnings: number; errorRatePercent: number;
+    byLayer: Record<string, number>; errorsByLayer: Record<string, number>; criticalAnomalies: number; spikes: number;
+    anomalies: AnomalyView[]; excerpts: string[];
+  };
+  incidents: CorrelatedIncident[];
+  security: { available: boolean; open: number; openBySeverity: Record<string, number>; top: Vulnerability[] };
+  risks: RiskItem[];
+  recommendations: RecommendationItem[];
+  llm: LlmAssessment | null;
+  previousScore: number | null;
+  previousVerdict: string | null;
+}
+
+export interface ApplicationValidationSummary {
+  id: number;
+  campaignId: number;
+  applicationCode: string;
+  applicationName: string;
+  criticality: Criticality;
+  state: 'PENDING' | 'RUNNING' | 'DONE' | 'ERROR';
+  verdict: Verdict | null;
+  finalVerdict: Verdict | null;
+  score: number | null;
+  baseScore: number | null;
+  llmAdjustment: number | null;
+  confidence: number | null;
+  reviewRequired: boolean;
+  testsTotal: number | null;
+  testsFailed: number | null;
+  successRate: number | null;
+  lineCoverage: number | null;
+  openCritical: number | null;
+  openHigh: number | null;
+  criticalAnomalies: number | null;
+  incidents: number | null;
+  logErrors: number | null;
+  llmStatus: string | null;
+  llmOpinion: string | null;
+  llmProvider: string | null;
+  error: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  humanDecision: 'CONFIRMED' | 'OVERRIDDEN' | null;
+  decidedBy: string | null;
+  decidedAt: string | null;
+  decisionComment: string | null;
+}
+
+export interface ValidationCampaign {
+  id: number;
+  label: string;
+  mode: 'LATEST_RESULTS' | 'RUN_TESTS';
+  useLlm: boolean;
+  status: 'RUNNING' | 'COMPLETED' | 'PARTIAL' | 'FAILED';
+  applications: string[];
+  triggeredBy: string;
+  startedAt: string;
+  finishedAt: string | null;
+  total: number;
+  validated: number;
+  reserves: number;
+  rejected: number;
+  inconclusive: number;
+  errors: number;
+  averageScore: number | null;
+  jobId: string | null;
+  results: ApplicationValidationSummary[];
+}
+
+export interface ApplicationValidationDetail {
+  summary: ApplicationValidationSummary;
+  report: ValidationReport | null;
+}
+
+export interface PortfolioEntry {
+  application: ApplicationView;
+  lastValidation: ApplicationValidationSummary | null;
+  scoreTrend: number[];
+}
+
+export interface PortfolioSummary {
+  applications: number;
+  validated: number;
+  reserves: number;
+  rejected: number;
+  inconclusive: number;
+  neverValidated: number;
+  pendingReviews: number;
+  averageScore: number | null;
+  entries: PortfolioEntry[];
+  generatedAt: string;
+}
+
+// ------------------------------------------------------------------------- Jira
+export interface JiraIssue {
+  key: string;
+  summary: string;
+  status: string;
+  priority: string;
+  assignee: string;
+  updated: string;
+  labels: string[];
+  url: string | null;
+}
+
+export interface JiraMatch {
+  issue: JiraIssue;
+  score: number;
+  reason: string;
+}
+
+export interface JiraIncidentQuery {
+  application?: string | null;
+  incidentType?: string | null;
+  incidentRef?: string | null;
+  text?: string | null;
+  recommendationId?: string | null;
+}
+
+export interface JiraProposal {
+  type: 'CREATE_ISSUE' | 'ADD_COMMENT';
+  application: string | null;
+  projectKey: string | null;
+  incidentType: string | null;
+  incidentRef: string | null;
+  issueKey: string | null;
+  summary: string | null;
+  description: string | null;
+  comment: string | null;
+  recommendationId: string | null;
+}
+
+export interface JiraStatus {
+  enabled: boolean;
+  configured: boolean;
+  mode: 'LIVE' | 'SIMULATION';
+  deployment: string;
+  baseUrl: string | null;
+  defaultProject: string | null;
+  issueType: string;
+  fourEyes: boolean;
+}
+
+export interface JiraAction {
+  id: number;
+  type: 'CREATE_ISSUE' | 'ADD_COMMENT';
+  status: 'PROPOSED' | 'EXECUTED' | 'SIMULATED' | 'REJECTED' | 'FAILED';
+  applicationCode: string | null;
+  projectKey: string | null;
+  incidentType: string | null;
+  incidentRef: string | null;
+  fingerprint: string | null;
+  issueKey: string | null;
+  summary: string | null;
+  description: string | null;
+  comment: string | null;
+  recommendationId: string | null;
+  proposedBy: string;
+  proposedAt: string;
+  decidedBy: string | null;
+  decidedAt: string | null;
+  decisionComment: string | null;
+  executedAt: string | null;
+  resultKey: string | null;
+  resultUrl: string | null;
+  error: string | null;
 }

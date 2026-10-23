@@ -407,3 +407,84 @@ def chat(question: str, context: str | None, history: list[dict] | None = None) 
         if len(items) > 5:
             out.append(f"(+ {len(items) - 5} autre(s) — voir l'écran correspondant)")
     return "\n".join(out)
+
+
+# ---------------------------------------------------------------------------
+# Avis de validation (repli déterministe quand aucun LLM n'est configuré)
+# ---------------------------------------------------------------------------
+_OPINION_BY_VERDICT = {"VALIDATED": "VALIDATE", "VALIDATED_WITH_RESERVES": "RESERVES",
+                       "REJECTED": "REJECT", "INCONCLUSIVE": "RESERVES"}
+
+
+def assess_validation(payload: dict) -> dict:
+    """
+    Avis consultatif sans LLM : reprend la décision des règles, la nuance avec deux signaux qualitatifs
+    (incident critique corrélé, nouveaux échecs de tests) et ne cite que des références autorisées.
+    """
+    allowed = set(payload.get("allowed_refs") or [])
+    det = payload.get("deterministic") or {}
+    verdict = det.get("verdict") or "INCONCLUSIVE"
+    opinion = _OPINION_BY_VERDICT.get(verdict, "RESERVES")
+    confidence = 0.7 if verdict != "INCONCLUSIVE" else 0.4
+    try:
+        if float(det.get("confidence", 1)) < 0.6:
+            confidence = min(confidence, 0.5)
+    except (TypeError, ValueError):
+        pass
+    adjustment = 0.0
+    cited: list[str] = []
+    sentences: list[str] = [f"Décision des règles : {verdict} ({det.get('score')}/100)."]
+    risks: list[str] = []
+    recommendations: list[str] = []
+
+    criteria = payload.get("criteria") or []
+    weak = [c for c in criteria if c.get("status") in ("FAIL", "WARN")]
+    if weak:
+        sentences.append("Critères sous le seuil : " + ", ".join(f"{c.get('label')} ({c.get('measured')})" for c in weak[:4]) + ".")
+        for c in weak[:4]:
+            risks.append(f"{c.get('label')} insuffisant(e) : {c.get('measured')} pour un seuil {c.get('threshold')}.")
+            if c.get("code") in allowed:
+                cited.append(c["code"])
+    missing = [c.get("label") for c in criteria if c.get("status") == "NO_DATA"]
+    if missing:
+        sentences.append("Preuves manquantes : " + ", ".join(missing) + ".")
+
+    incidents = payload.get("incidents") or []
+    critical_incidents = [i for i in incidents if i.get("severity") == "CRITICAL"]
+    if incidents:
+        top = incidents[0]
+        sentences.append(f"Incident principal : cause racine probable « {str(top.get('root_cause'))[:120]} » "
+                         f"(confiance {top.get('confidence')} %).")
+        if top.get("id") in allowed:
+            cited.append(top["id"])
+        recommendations.append(f"Traiter la cause racine de l'incident {top.get('id')} avant la mise en production.")
+    if critical_incidents and opinion == "VALIDATE":
+        opinion, adjustment = "RESERVES", -3.0
+        sentences.append("Un incident critique corrélé reste ouvert : une validation sans réserve paraît prématurée.")
+
+    tests = payload.get("tests") or {}
+    new_failures = [r for r in (tests.get("new_failures") or []) if r in allowed]
+    if new_failures:
+        cited.extend(new_failures[:5])
+        risks.append(f"Régression : {len(new_failures)} test(s) réussi(s) auparavant échoue(nt) désormais.")
+        recommendations.append("Corriger en priorité les nouveaux échecs : " + ", ".join(new_failures[:3]) + ".")
+        if opinion == "VALIDATE":
+            adjustment = min(adjustment, -2.0)
+
+    for v in (payload.get("vulnerabilities") or [])[:3]:
+        if v.get("severity") in ("CRITICAL", "HIGH") and v.get("ref") in allowed:
+            cited.append(v["ref"])
+            fix = f" vers {v.get('fixed_version')}" if v.get("fixed_version") else ""
+            recommendations.append(f"Mettre à jour {v.get('component')}{fix} ({v.get('id')}).")
+
+    if not recommendations and opinion == "VALIDATE":
+        recommendations.append("Confirmer la décision et archiver le rapport de validation.")
+    return {
+        "opinion": opinion,
+        "confidence": round(confidence, 2),
+        "adjustment": adjustment,
+        "justification": " ".join(sentences),
+        "risks": risks[:6],
+        "recommendations": recommendations[:6],
+        "cited_refs": list(dict.fromkeys(cited)),
+    }

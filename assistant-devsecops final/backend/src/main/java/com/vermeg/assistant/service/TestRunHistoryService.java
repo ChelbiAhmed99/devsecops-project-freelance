@@ -49,11 +49,28 @@ public class TestRunHistoryService {
         this.eventService = eventService;
     }
 
+    @Value("${assistant.applications.default-code:assistant-devsecops}")
+    private String defaultApplication = "assistant-devsecops";
+
+    /**
+     * Métadonnées d'une exécution. {@code application} : code de l'application testée
+     * (null = application par défaut, comportement mono-projet historique).
+     */
     public record RunMetadata(String trigger, String branch, String commitSha, String pipelineId,
                               LocalDateTime windowStart, LocalDateTime windowEnd, Integer exitCode,
-                              String outputTail) {
+                              String outputTail, String application) {
+        /** Constructeur historique (sans application) conservé pour compatibilité. */
+        public RunMetadata(String trigger, String branch, String commitSha, String pipelineId,
+                           LocalDateTime windowStart, LocalDateTime windowEnd, Integer exitCode, String outputTail) {
+            this(trigger, branch, commitSha, pipelineId, windowStart, windowEnd, exitCode, outputTail, null);
+        }
+
         public static RunMetadata of(String trigger) {
-            return new RunMetadata(trigger, null, null, null, null, null, null, null);
+            return new RunMetadata(trigger, null, null, null, null, null, null, null, null);
+        }
+
+        public RunMetadata withApplication(String app) {
+            return new RunMetadata(trigger, branch, commitSha, pipelineId, windowStart, windowEnd, exitCode, outputTail, app);
         }
     }
 
@@ -62,6 +79,8 @@ public class TestRunHistoryService {
         TestExecutionSummary summary = TestExecutionSummary.fromSuites(suites);
         TestRunRecord r = new TestRunRecord();
         r.setExecutedAt(LocalDateTime.now());
+        r.setApplicationCode(meta.application() == null || meta.application().isBlank()
+                ? defaultApplication : meta.application());
         r.setTrigger(meta.trigger());
         r.setTriggeredBy(CurrentUser.username());
         r.setBranch(meta.branch());
@@ -92,7 +111,7 @@ public class TestRunHistoryService {
         eventService.publish("tests.completed", failed > 0 ? "warning" : "success",
                 failed > 0 ? failed + " test(s) en échec" : "Tous les tests sont passés",
                 Map.of("runId", saved.getId(), "total", summary.getTotalTests(), "failed", failed,
-                        "successRate", summary.getSuccessRatePercent()));
+                        "successRate", summary.getSuccessRatePercent(), "application", saved.getApplicationCode()));
         return toSummary(saved);
     }
 
@@ -129,6 +148,61 @@ public class TestRunHistoryService {
         return points;
     }
 
+    // ------------------------------------------------------ vues par application
+
+    @Transactional(readOnly = true)
+    public Optional<TestExecutionSummary> latest(String application) {
+        if (application == null || application.isBlank()) return latest();
+        return repository.findFirstByApplicationCodeOrderByExecutedAtDesc(application).map(this::toSummary);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<TestRunRecord> latestRecord(String application) {
+        if (application == null || application.isBlank()) return latestRecord();
+        return repository.findFirstByApplicationCodeOrderByExecutedAtDesc(application);
+    }
+
+    /** Les {@code limit} dernières exécutions d'une application, de la plus récente à la plus ancienne. */
+    @Transactional(readOnly = true)
+    public List<TestRunRecord> recentRecords(String application, int limit) {
+        PageRequest page = PageRequest.of(0, Math.max(1, Math.min(limit, 200)));
+        return application == null || application.isBlank()
+                ? repository.findAllByOrderByExecutedAtDesc(page)
+                : repository.findByApplicationCodeOrderByExecutedAtDesc(application, page);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ApiDtos.TestRunPoint> history(String application, int limit) {
+        if (application == null || application.isBlank()) return history(limit);
+        List<ApiDtos.TestRunPoint> points = new ArrayList<>(recentRecords(application, limit).stream()
+                .map(r -> new ApiDtos.TestRunPoint(r.getId(), r.getExecutedAt(), r.getTotalTests(),
+                        r.getFailures() + r.getErrors(), r.getSuccessRate(), r.getLineCoverage(),
+                        r.getTrigger(), r.getBranch()))
+                .toList());
+        Collections.reverse(points);
+        return points;
+    }
+
+    @Transactional(readOnly = true)
+    public List<ApiDtos.FlakyTest> flakyTests(String application) {
+        if (application == null || application.isBlank()) return flakyTests();
+        List<TestRunRecord> runs = new ArrayList<>(recentRecords(application, flakyWindow));
+        Collections.reverse(runs);
+        return computeFlaky(runs);
+    }
+
+    /** Exécutions postérieures à une date (vérification après correction). */
+    @Transactional(readOnly = true)
+    public List<TestRunRecord> runsAfter(String application, LocalDateTime after) {
+        return application == null || application.isBlank()
+                ? repository.findByExecutedAtAfterOrderByExecutedAtAsc(after)
+                : repository.findByApplicationCodeAndExecutedAtAfterOrderByExecutedAtAsc(application, after);
+    }
+
+    public TestExecutionSummary summaryOf(TestRunRecord record) {
+        return toSummary(record);
+    }
+
     /**
      * Un test est "flaky" s'il a à la fois réussi et échoué sur les N dernières
      * exécutions. Score = nombre de changements d'état / (exécutions observées - 1).
@@ -137,6 +211,10 @@ public class TestRunHistoryService {
     public List<ApiDtos.FlakyTest> flakyTests() {
         List<TestRunRecord> runs = new ArrayList<>(repository.findAllByOrderByExecutedAtDesc(PageRequest.of(0, flakyWindow)));
         Collections.reverse(runs); // ordre chronologique
+        return computeFlaky(runs);
+    }
+
+    private List<ApiDtos.FlakyTest> computeFlaky(List<TestRunRecord> runs) {
         Map<String, List<TestCaseResult.Status>> history = new LinkedHashMap<>();
         Map<String, String[]> names = new LinkedHashMap<>();
         for (TestRunRecord run : runs) {
@@ -188,6 +266,7 @@ public class TestRunHistoryService {
         s.setLineCoverage(r.getLineCoverage());
         s.setBranchCoverage(r.getBranchCoverage());
         s.setDurationSeconds(r.getDurationSeconds());
+        s.setApplication(r.getApplicationCode());
         return s;
     }
 }

@@ -69,6 +69,29 @@ public class AiRecommendationRecord {
     @Column(length = 2000)
     private String reviewComment;
 
+    @Column(name = "application_code", length = 60)
+    private String applicationCode;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private AiRecommendation.FixStatus fixStatus;
+
+    @Column(length = 80)
+    private String appliedBy;
+
+    private LocalDateTime appliedAt;
+
+    @Column(length = 300)
+    private String appliedReference;
+
+    private LocalDateTime verifiedAt;
+
+    @Column(length = 2000)
+    private String verificationDetails;
+
+    @Column(length = 6000)
+    private String diagnostic;
+
     public AiRecommendationRecord() {
     }
 
@@ -95,6 +118,14 @@ public class AiRecommendationRecord {
         reviewedBy = r.getReviewedBy();
         reviewedAt = r.getReviewedAt();
         reviewComment = VulnerabilityRecord.truncate(r.getReviewComment(), 2000);
+        applicationCode = r.getApplicationCode();
+        fixStatus = r.getFixStatus();
+        appliedBy = r.getAppliedBy();
+        appliedAt = r.getAppliedAt();
+        appliedReference = VulnerabilityRecord.truncate(r.getAppliedReference(), 300);
+        verifiedAt = r.getVerifiedAt();
+        verificationDetails = VulnerabilityRecord.truncate(r.getVerificationDetails(), 2000);
+        diagnostic = VulnerabilityRecord.truncate(r.getDiagnostic(), 6000);
     }
 
     public AiRecommendation toModel() {
@@ -108,6 +139,14 @@ public class AiRecommendationRecord {
         r.setReviewedBy(reviewedBy);
         r.setReviewedAt(reviewedAt);
         r.setReviewComment(reviewComment);
+        r.setApplicationCode(applicationCode);
+        r.setFixStatus(fixStatus);
+        r.setAppliedBy(appliedBy);
+        r.setAppliedAt(appliedAt);
+        r.setAppliedReference(appliedReference);
+        r.setVerifiedAt(verifiedAt);
+        r.setVerificationDetails(verificationDetails);
+        r.setDiagnostic(diagnostic);
         return r;
     }
 

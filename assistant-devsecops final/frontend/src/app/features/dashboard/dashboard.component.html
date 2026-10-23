@@ -71,6 +71,34 @@
     </a>
   </section>
 
+  @if (portfolio(); as p) {
+    <section class="panel">
+      <div class="panel__header">
+        <h2>Validation des applications</h2>
+        <a routerLink="/validation">Valider des applications →</a>
+      </div>
+      <p class="muted">{{ p.applications }} application(s) · <span class="text-ok">{{ p.validated }} validée(s)</span> ·
+        <span class="text-high">{{ p.reserves }} avec réserves</span> · <span class="text-critical">{{ p.rejected }} rejetée(s)</span> ·
+        {{ p.inconclusive + p.neverValidated }} non concluante(s) ou jamais validée(s)
+        @if (p.pendingReviews) { · <strong>{{ p.pendingReviews }} revue(s) humaine(s) en attente</strong> }</p>
+      <div class="app-strip">
+        @for (e of riskyApps(); track e.application.code) {
+          @if (e.lastValidation; as v) {
+            <a class="app-chip app-chip--{{ v.finalVerdict | verdictClass }}" [routerLink]="['/validation/report', v.id]">
+              <app-score-ring [score]="v.score" [verdict]="v.finalVerdict" [size]="40" />
+              <span><strong>{{ e.application.name }}</strong><span class="muted">{{ v.finalVerdict | lbl: 'verdict' }}</span></span>
+            </a>
+          } @else {
+            <a class="app-chip" routerLink="/validation" [queryParams]="{ apps: e.application.code }">
+              <app-score-ring [score]="null" [size]="40" />
+              <span><strong>{{ e.application.name }}</strong><span class="muted">jamais validée</span></span>
+            </a>
+          }
+        }
+      </div>
+    </section>
+  }
+
   <section class="grid grid--2">
     <div class="panel">
       <h2>Quality gate</h2>

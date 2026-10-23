@@ -1,0 +1,60 @@
+{
+ "SchemaVersion": 2,
+ "ArtifactName": "back-office-titres:1.0",
+ "Results": [
+  {
+   "Target": "assistant-devsecops-backend:latest (alpine 3.19.1)",
+   "Class": "os-pkgs",
+   "Vulnerabilities": [
+    {
+     "VulnerabilityID": "CVE-2024-4741",
+     "PkgName": "libcrypto3",
+     "InstalledVersion": "3.1.4-r5",
+     "FixedVersion": "3.1.5-r0",
+     "Severity": "HIGH",
+     "Title": "openssl: Use After Free with SSL_free_buffers",
+     "Description": "Calling SSL_free_buffers potentially causes use after free.",
+     "CVSS": {
+      "nvd": {
+       "V3Score": 7.5
+      }
+     }
+    },
+    {
+     "VulnerabilityID": "CVE-2023-42366",
+     "PkgName": "busybox",
+     "InstalledVersion": "1.36.1-r15",
+     "FixedVersion": "1.36.1-r16",
+     "Severity": "MEDIUM",
+     "Title": "busybox: heap-buffer-overflow",
+     "Description": "A heap-buffer-overflow was discovered in BusyBox awk.",
+     "CVSS": {
+      "nvd": {
+       "V3Score": 5.5
+      }
+     }
+    }
+   ]
+  },
+  {
+   "Target": "app/app.jar",
+   "Class": "lang-pkgs",
+   "Vulnerabilities": [
+    {
+     "VulnerabilityID": "CVE-2024-38816",
+     "PkgName": "org.springframework:spring-webmvc",
+     "InstalledVersion": "6.1.12",
+     "FixedVersion": "6.1.13",
+     "Severity": "HIGH",
+     "Title": "spring-webmvc: Path traversal vulnerability in functional web frameworks",
+     "Description": "Applications serving static resources through the functional web frameworks are vulnerable to path traversal attacks.",
+     "CVSS": {
+      "nvd": {
+       "V3Score": 7.5
+      }
+     }
+    }
+   ]
+  }
+ ]
+}

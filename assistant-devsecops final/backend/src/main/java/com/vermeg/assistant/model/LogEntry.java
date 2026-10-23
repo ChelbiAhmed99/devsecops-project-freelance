@@ -23,6 +23,10 @@ public class LogEntry {
     private String message;
     /** Trace de pile éventuelle (lignes de continuation "at ...", "Caused by: ..."). */
     private String stackTrace;
+    /** Application d'origine (null = non rattachée). */
+    private String application;
+    /** Couche du log : APPLICATION, SERVER ou CICD (voir LogType). */
+    private String logType;
 
     public enum LogLevel {
         DEBUG, INFO, WARN, ERROR, FATAL, UNKNOWN;
@@ -67,6 +71,10 @@ public class LogEntry {
     public void setMessage(String message) { this.message = message; }
     public String getStackTrace() { return stackTrace; }
     public void setStackTrace(String stackTrace) { this.stackTrace = stackTrace; }
+    public String getApplication() { return application; }
+    public void setApplication(String application) { this.application = application; }
+    public String getLogType() { return logType; }
+    public void setLogType(String logType) { this.logType = logType; }
 
     @Override
     public boolean equals(Object o) {

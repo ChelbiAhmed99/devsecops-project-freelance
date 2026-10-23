@@ -1,0 +1,191 @@
+<div class="page-header">
+  <div>
+    <p class="eyebrow">Validation multi-applications</p>
+    <h1>Validation des applications</h1>
+    <p class="page-header__lead">Sélectionnez une ou plusieurs applications : chacune est validée isolément et obtient son score,
+      sa décision, ses anomalies et <strong>son propre rapport</strong>.</p>
+  </div>
+  <div class="actions">
+    <button class="btn" type="button" (click)="load()">Actualiser</button>
+  </div>
+</div>
+
+<details class="help">
+  <summary>Comment la décision est-elle prise ?</summary>
+  <div class="help__body">
+    <p><strong>Validation hybride</strong> : six critères mesurés (réussite des tests, couverture, stabilité, sécurité, santé des logs
+      applicatifs/serveur/CI, non-régression) sont notés de 0 à 100 puis pondérés. Des <strong>règles bloquantes</strong> (vulnérabilité
+      critique, taux de réussite trop bas…) imposent le rejet ; des preuves insuffisantes donnent « non concluante ».</p>
+    <p><strong>Adaptative</strong> : les seuils dépendent de la criticité de l'application, la non-régression est mesurée par rapport à
+      <em>son propre historique</em>, et un critère fondé sur peu de données pèse moins.</p>
+    <p><strong>IA consultative et bornée</strong> : le LLM donne un avis et peut ajuster le score de ± 5 points au plus ; il ne lève
+      jamais une règle bloquante, ses références sont vérifiées (anti-hallucination) et tout désaccord impose une revue humaine.</p>
+    <p><strong>Humain décisionnaire</strong> : un responsable qualité confirme ou corrige chaque décision (commentaire obligatoire en cas de correction).</p>
+  </div>
+</details>
+
+@if (portfolio(); as p) {
+  <section class="grid grid--kpi">
+    <div class="panel stat"><span class="stat__value">{{ p.applications }}</span><span class="stat__label">applications</span></div>
+    <div class="panel stat panel--ok"><span class="stat__value">{{ p.validated }}</span><span class="stat__label">validées</span></div>
+    <div class="panel stat panel--high"><span class="stat__value">{{ p.reserves }}</span><span class="stat__label">avec réserves</span></div>
+    <div class="panel stat panel--critical"><span class="stat__value">{{ p.rejected }}</span><span class="stat__label">rejetées</span></div>
+    <div class="panel stat"><span class="stat__value">{{ p.inconclusive + p.neverValidated }}</span><span class="stat__label">non concluantes / jamais validées</span></div>
+    <div class="panel stat" [class.panel--medium]="p.pendingReviews > 0"><span class="stat__value">{{ p.pendingReviews }}</span><span class="stat__label">revues humaines en attente</span></div>
+    <div class="panel stat"><span class="stat__value">{{ p.averageScore ?? '—' }}</span><span class="stat__label">score moyen</span></div>
+  </section>
+}
+
+<section class="panel launcher">
+  <div class="panel__header">
+    <h2>Nouvelle campagne</h2>
+    <button class="link" type="button" (click)="toggleAll()">{{ allSelected() ? 'Tout désélectionner' : 'Tout sélectionner' }}</button>
+  </div>
+  <div class="app-picker">
+    @for (a of apps(); track a.code) {
+      <label class="app-pick" [class.app-pick--on]="isSelected(a.code)">
+        <input type="checkbox" [checked]="isSelected(a.code)" (change)="toggle(a.code)" />
+        <span class="app-pick__name">{{ a.name }}</span>
+        <span class="badge crit crit--{{ a.criticality }}">{{ a.criticality | lbl: 'criticality' }}</span>
+        @if (verdictOf(a.code); as v) { <span class="badge badge--{{ v | verdictClass }}">{{ v | lbl: 'verdict' }}</span> }
+      </label>
+    } @empty {
+      <p class="empty">Aucune application active. <a routerLink="/applications">Déclarez vos applications</a>.</p>
+    }
+  </div>
+  <div class="launcher__options">
+    <div class="segmented" role="group" aria-label="Mode">
+      <button type="button" [class.active]="mode === 'LATEST_RESULTS'" (click)="mode = 'LATEST_RESULTS'">Dernières preuves connues</button>
+      <button type="button" [class.active]="mode === 'RUN_TESTS'" (click)="mode = 'RUN_TESTS'">Exécuter les tests d'abord</button>
+    </div>
+    <label class="checkbox"><input type="checkbox" [(ngModel)]="useLlm" name="llm" /> Avis IA (consultatif, borné)</label>
+    <input type="text" name="label" [(ngModel)]="label" placeholder="Libellé (ex. Release 4.2 — recette)" aria-label="Libellé de la campagne" />
+    <button class="btn btn--primary" type="button" [disabled]="!selectedCount() || launching() || !!running()" (click)="launch()">
+      Valider {{ selectedCount() }} application(s)
+    </button>
+  </div>
+  @if (mode === 'RUN_TESTS') {
+    <p class="scan__hint">Les tests sont lancés (mvn test) dans le dossier projet déclaré pour chaque application ; sans dossier, les derniers
+      résultats publiés par le pipeline sont utilisés.</p>
+  }
+</section>
+
+@if (running(); as c) {
+  <div class="job-banner">
+    <span class="spinner"></span>
+    <div class="job-banner__body">
+      <strong>{{ c.label }}</strong> — {{ progress() }} %
+      <div class="progress"><div class="progress__bar" [style.width.%]="progress()"></div></div>
+      <ul class="run-steps">
+        @for (r of c.results; track r.id) {
+          <li class="run-step run-step--{{ r.state }}">
+            <span>{{ r.applicationName }}</span>
+            @switch (r.state) {
+              @case ('DONE') { <span class="badge badge--{{ r.verdict | verdictClass }}">{{ r.verdict | lbl: 'verdict' }} · {{ r.score }}</span> }
+              @case ('ERROR') { <span class="badge badge--critical">erreur</span> }
+              @case ('RUNNING') { <span class="muted">en cours…</span> }
+              @default { <span class="muted">en attente</span> }
+            }
+          </li>
+        }
+      </ul>
+    </div>
+  </div>
+}
+
+<section class="panel panel--flush">
+  <div class="panel__header panel__header--padded">
+    <h2>Tableau de bord du portefeuille</h2>
+    <span class="muted">Dernière validation de chaque application, les plus à risque d'abord</span>
+  </div>
+  <table class="table portfolio-table">
+    <thead>
+      <tr><th>Application</th><th>Décision</th><th>Score</th><th>Tendance</th><th>Tests</th><th>Couverture</th>
+        <th>Vulnérabilités</th><th>Logs / incidents</th><th>Revue</th><th></th></tr>
+    </thead>
+    <tbody>
+      @for (e of ranked(); track e.application.code) {
+        @let v = e.lastValidation;
+        <tr>
+          <td><strong>{{ e.application.name }}</strong><div class="muted"><code>{{ e.application.code }}</code> ·
+            <span class="crit-text crit-text--{{ e.application.criticality }}">{{ e.application.criticality | lbl: 'criticality' }}</span></div></td>
+          @if (v) {
+            <td><span class="badge badge--{{ v.finalVerdict | verdictClass }}">{{ v.finalVerdict | lbl: 'verdict' }}</span>
+              @if (v.humanDecision === 'OVERRIDDEN') { <div class="muted">auto : {{ v.verdict | lbl: 'verdict' }}</div> }</td>
+            <td><app-score-ring [score]="v.score" [verdict]="v.finalVerdict" [size]="44" /></td>
+            <td class="spark spark--{{ v.finalVerdict | verdictClass }}"><app-sparkline [values]="e.scoreTrend" ariaLabel="Tendance des scores" /></td>
+            <td class="mono">{{ v.successRate ?? '—' }}{{ v.successRate !== null ? ' %' : '' }}<div class="muted">{{ v.testsFailed ?? 0 }} échec(s) / {{ v.testsTotal ?? 0 }}</div></td>
+            <td class="mono">{{ v.lineCoverage ?? '—' }}{{ v.lineCoverage !== null ? ' %' : '' }}</td>
+            <td><span class="badge badge--{{ (v.openCritical ?? 0) > 0 ? 'critical' : 'low' }}">{{ v.openCritical ?? 0 }} crit.</span>
+              <span class="badge badge--{{ (v.openHigh ?? 0) > 0 ? 'high' : 'low' }}">{{ v.openHigh ?? 0 }} hautes</span></td>
+            <td>{{ v.criticalAnomalies ?? 0 }} anomalie(s) critique(s)<div class="muted">{{ v.incidents ?? 0 }} incident(s) corrélé(s)</div></td>
+            <td>
+              @if (v.humanDecision) { <span class="badge badge--ok">{{ v.humanDecision | lbl }}</span><div class="muted">{{ v.decidedBy }}</div> }
+              @else if (v.reviewRequired) { <span class="badge badge--high">requise</span> }
+              @else { <span class="muted">recommandée</span> }
+            </td>
+            <td><a class="btn btn--sm" [routerLink]="['/validation/report', v.id]">Rapport</a></td>
+          } @else {
+            <td colspan="8" class="muted">Jamais validée</td>
+            <td><button class="btn btn--sm" type="button" (click)="toggle(e.application.code)">{{ isSelected(e.application.code) ? 'Retirer' : 'Sélectionner' }}</button></td>
+          }
+        </tr>
+      } @empty {
+        <tr><td colspan="10" class="empty">Aucune application.</td></tr>
+      }
+    </tbody>
+  </table>
+</section>
+
+<section class="panel">
+  <h2>Campagnes récentes</h2>
+  @for (c of campaigns(); track c.id) {
+    <div class="campaign">
+      <button class="campaign__header" type="button" (click)="toggleCampaign(c.id)" [attr.aria-expanded]="expanded() === c.id">
+        <span><strong>#{{ c.id }} · {{ c.label }}</strong></span>
+        <span class="badge badge--{{ c.status === 'COMPLETED' ? 'ok' : c.status === 'RUNNING' ? 'medium' : 'high' }}">{{ c.status | lbl }}</span>
+        <span class="muted">{{ c.startedAt | dt }} · {{ c.triggeredBy }} · {{ c.total }} app. ·
+          {{ c.mode === 'RUN_TESTS' ? 'tests exécutés' : 'dernières preuves' }}{{ c.useLlm ? ' · IA' : '' }}</span>
+        <span class="campaign__counts">
+          <span class="badge badge--ok">{{ c.validated }}</span><span class="badge badge--high">{{ c.reserves }}</span>
+          <span class="badge badge--critical">{{ c.rejected }}</span><span class="badge">{{ c.inconclusive }}</span>
+        </span>
+        <span class="suite__chevron">{{ expanded() === c.id ? '▾' : '▸' }}</span>
+      </button>
+      @if (expanded() === c.id) {
+        <div class="campaign__body">
+          <table class="table">
+            <thead><tr><th>Application</th><th>Décision</th><th>Score</th><th>Confiance</th><th>IA</th><th>Rapport</th></tr></thead>
+            <tbody>
+              @for (r of c.results; track r.id) {
+                <tr>
+                  <td>{{ r.applicationName }}</td>
+                  <td>
+                    @if (r.state === 'DONE') { <span class="badge badge--{{ r.finalVerdict | verdictClass }}">{{ r.finalVerdict | lbl: 'verdict' }}</span> }
+                    @else if (r.state === 'ERROR') { <span class="badge badge--critical" [title]="r.error ?? ''">erreur</span> }
+                    @else { <span class="muted">{{ r.state | lbl }}</span> }
+                  </td>
+                  <td class="mono">{{ r.score ?? '—' }}</td>
+                  <td class="mono">{{ r.confidence !== null ? (r.confidence * 100).toFixed(0) + ' %' : '—' }}</td>
+                  <td class="muted">{{ r.llmStatus ?? '—' }}{{ r.llmOpinion ? ' · ' + r.llmOpinion : '' }}</td>
+                  <td class="actions">
+                    @if (r.state === 'DONE') {
+                      <a class="btn btn--sm btn--primary" [routerLink]="['/validation/report', r.id]">Ouvrir</a>
+                      <button class="btn btn--sm" type="button" (click)="download(r.id, r.applicationCode, 'html')">HTML</button>
+                      <button class="btn btn--sm" type="button" (click)="download(r.id, r.applicationCode, 'md')">MD</button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+          @if (c.status !== 'RUNNING') {
+            <button class="btn" type="button" (click)="downloadZip(c)">Télécharger les {{ c.total - c.errors }} rapports (ZIP)</button>
+          }
+        </div>
+      }
+    </div>
+  } @empty {
+    <p class="empty">Aucune campagne pour l'instant : sélectionnez des applications ci-dessus et lancez la validation.</p>
+  }
+</section>

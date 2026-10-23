@@ -25,7 +25,11 @@
       <li><strong>Pics de fréquence</strong> — le volume d'erreurs est découpé en fenêtres de 5 minutes ; une fenêtre
         nettement au-dessus de la normale est signalée comme pic.</li>
       <li><strong>Explorateur</strong> — recherche libre dans tous les logs (niveau, service, texte, période).</li>
-      <li><strong>Ingestion</strong> — ajout manuel de logs.</li>
+      <li><strong>Incidents corrélés</strong> — les erreurs proches dans le temps sont regroupées en incidents, sur trois couches :
+        <em>applicative</em>, <em>serveur</em> (JBoss/WildFly : datasources, déploiement, transactions, Undertow…) et <em>CI/CD</em>.
+        Pour chaque incident, l'assistant désigne la <strong>cause racine probable</strong> et explique pourquoi (facteurs chiffrés,
+        règles causales du domaine, chaîne cause → effets).</li>
+      <li><strong>Ingestion</strong> — ajout manuel de logs (format JBoss/WildFly server.log et sorties Maven/Jenkins reconnus).</li>
     </ol>
     <p>Sur chaque anomalie, « Expliquer (IA) » demande une cause probable et une correction à l'assistant IA.</p>
   </div>
@@ -38,6 +42,17 @@
     <div class="panel stat"><span class="stat__value">{{ anomalies().length }}</span><span class="stat__label">groupes d'anomalies</span></div>
     <div class="panel stat"><span class="stat__value">{{ s.lastAt | relative }}</span><span class="stat__label">dernier log</span></div>
   </section>
+
+  @if (layerEntries().length) {
+    <section class="layers layers--strip">
+      @for (l of layerEntries(); track l[0]) {
+        <button type="button" class="layer-card layer-card--{{ l[0] }}" [class.layer-card--on]="layerFilter() === l[0]"
+                (click)="layerFilter.set(layerFilter() === l[0] ? '' : $any(l[0])); selectTab('anomalies')">
+          <span class="eyebrow">{{ l[0] | lbl: 'layer' }}</span><strong>{{ l[1] }}</strong> ligne(s)
+        </button>
+      }
+    </section>
+  }
 
   <section class="grid grid--3-1">
     <div class="panel">
@@ -65,6 +80,7 @@
 
 <nav class="tabs" role="tablist">
   <button role="tab" type="button" [class.active]="tab() === 'anomalies'" (click)="selectTab('anomalies')">Anomalies</button>
+  <button role="tab" type="button" [class.active]="tab() === 'incidents'" (click)="selectTab('incidents')">Incidents corrélés</button>
   <button role="tab" type="button" [class.active]="tab() === 'spikes'" (click)="selectTab('spikes')">Pics de fréquence</button>
   <button role="tab" type="button" [class.active]="tab() === 'explorer'" (click)="selectTab('explorer')">Explorateur</button>
   <button role="tab" type="button" [class.active]="tab() === 'ingest'" (click)="selectTab('ingest')">Ingestion</button>
@@ -81,6 +97,10 @@
         <option value="">Toutes catégories</option>
         @for (c of categories(); track c) { <option [value]="c">{{ c | lbl: 'category' }}</option> }
       </select>
+      <select [value]="layerFilter()" (change)="layerFilter.set($any($event.target).value)" aria-label="Couche">
+        <option value="">Toutes couches</option>
+        @for (l of layers; track l) { <option [value]="l">{{ l | lbl: 'layer' }}</option> }
+      </select>
       <label class="checkbox"><input type="checkbox" [checked]="onlyCritical()" (change)="onlyCritical.set(!onlyCritical())" /> Critiques uniquement</label>
       <span class="muted">Moteur utilisé : <code>{{ engineUsed() }}</code></span>
     </div>
@@ -94,10 +114,13 @@
           <div>
             <span class="badge badge--{{ a.critical ? 'critical' : (a.level | sev) }}">{{ a.critical ? 'CRITIQUE' : a.level }}</span>
             <span class="badge badge--outline">{{ a.category | lbl: 'category' }}</span>
+            <span class="badge layer layer--{{ a.logType ?? 'APPLICATION' }}">{{ (a.logType ?? 'APPLICATION') | lbl: 'layer' }}</span>
+            @if (a.errorCode) { <span class="badge badge--outline mono">{{ a.errorCode }}</span> }
             <span class="muted">{{ a.occurrences }} occurrence(s) · {{ a.firstSeen | dt }} → {{ a.lastSeen | dt }}</span>
           </div>
           <div class="actions">
             <button class="btn btn--sm" type="button" (click)="toggle(a.key)">{{ expanded() === a.key ? 'Masquer' : 'Détails' }}</button>
+            <button class="btn btn--sm" type="button" (click)="jiraAnomaly(a)">Jira</button>
             <button class="btn btn--sm btn--primary" type="button" (click)="explainAnomaly(a)">Expliquer (IA)</button>
           </div>
         </header>
@@ -119,6 +142,23 @@
       </article>
     } @empty {
       @if (!loadingAnomalies()) { <p class="empty">Aucune anomalie ne correspond aux filtres.</p> }
+    }
+  }
+
+  @case ('incidents') {
+    <div class="toolbar">
+      <select [value]="incidentsApp()" (change)="setIncidentsApp($any($event.target).value)" aria-label="Application">
+        <option value="">Toutes les applications</option>
+        @for (a of applications(); track a.code) { <option [value]="a.code">{{ a.name }}</option> }
+      </select>
+      <button class="btn" type="button" (click)="loadIncidents()">Recalculer</button>
+      <span class="muted">Une rafale d'erreurs se termine après 5 min sans nouvelle erreur.</span>
+    </div>
+    @if (loadingIncidents()) { <div class="loading"><span class="spinner"></span> Corrélation…</div> }
+    @for (i of incidents(); track i.id) {
+      <app-incident-card [incident]="i" (explain)="explainIncident($event)" (jira)="jiraIncident($event)" />
+    } @empty {
+      @if (!loadingIncidents()) { <p class="empty">Aucun incident : pas de rafale d'erreurs corrélées dans la fenêtre d'analyse.</p> }
     }
   }
 
@@ -170,6 +210,14 @@
         <option value="">Tous services</option>
         @for (s of sources(); track s) { <option [value]="s">{{ s }}</option> }
       </select>
+      <select name="logType" [(ngModel)]="search.logType" aria-label="Couche">
+        <option value="">Toutes couches</option>
+        @for (l of layers; track l) { <option [value]="l">{{ l | lbl: 'layer' }}</option> }
+      </select>
+      <select name="app" [(ngModel)]="search.app" aria-label="Application">
+        <option value="">Toutes applications</option>
+        @for (a of applications(); track a.code) { <option [value]="a.code">{{ a.name }}</option> }
+      </select>
       <input type="datetime-local" name="from" [(ngModel)]="search.from" aria-label="Depuis" />
       <input type="datetime-local" name="to" [(ngModel)]="search.to" aria-label="Jusqu'à" />
       <button class="btn btn--primary" type="submit">Rechercher</button>
@@ -178,20 +226,21 @@
     @if (page(); as p) {
       <div class="panel panel--flush">
         <table class="table table--logs">
-          <thead><tr><th>Horodatage</th><th>Niveau</th><th>Service</th><th>Message</th></tr></thead>
+          <thead><tr><th>Horodatage</th><th>Niveau</th><th>Couche</th><th>Service</th><th>Message</th></tr></thead>
           <tbody>
             @for (l of p.content; track l.id ?? $index) {
               <tr (click)="toggle('log-' + (l.id ?? $index))" [class.clickable]="!!l.stackTrace">
                 <td class="mono nowrap">{{ l.timestamp | dt }}</td>
                 <td><span class="badge badge--{{ l.level | sev }}">{{ l.level }}</span></td>
-                <td>{{ l.source }}</td>
+                <td><span class="badge layer layer--{{ l.logType ?? 'APPLICATION' }}">{{ (l.logType ?? 'APPLICATION') | lbl: 'layer' }}</span></td>
+                <td>{{ l.source }}@if (l.application) { <div class="muted">{{ l.application }}</div> }</td>
                 <td class="mono">{{ l.message }} @if (l.stackTrace) { <span class="muted">[trace]</span> }</td>
               </tr>
               @if (l.stackTrace && expanded() === 'log-' + (l.id ?? $index)) {
-                <tr><td colspan="4"><pre class="code-block">{{ l.stackTrace }}</pre></td></tr>
+                <tr><td colspan="5"><pre class="code-block">{{ l.stackTrace }}</pre></td></tr>
               }
             } @empty {
-              <tr><td colspan="4" class="empty">Aucun résultat.</td></tr>
+              <tr><td colspan="5" class="empty">Aucun résultat.</td></tr>
             }
           </tbody>
         </table>
@@ -208,9 +257,22 @@
     <section class="grid grid--2">
       <div class="panel">
         <h2>Coller des logs</h2>
-        <p class="muted">Formats reconnus : classique <code>date NIVEAU [service] message</code>, Spring Boot 3, JSON (Logstash/ECS), traces de pile.</p>
-        <label class="field"><span>Service par défaut (optionnel)</span>
-          <input type="text" [(ngModel)]="ingestSource" placeholder="ex. payment-service" /></label>
+        <p class="muted">Formats reconnus : classique <code>date NIVEAU [service] message</code>, Spring Boot 3, JSON (Logstash/ECS),
+          JBoss/WildFly (<code>server.log</code> et console), sorties Maven/Jenkins/GitLab, traces de pile.</p>
+        <div class="grid grid--3">
+          <label class="field"><span>Service par défaut (optionnel)</span>
+            <input type="text" [(ngModel)]="ingestSource" placeholder="ex. payment-service" /></label>
+          <label class="field"><span>Application</span>
+            <select [(ngModel)]="ingestApp">
+              <option value="">Déduite de la source</option>
+              @for (a of applications(); track a.code) { <option [value]="a.code">{{ a.name }}</option> }
+            </select></label>
+          <label class="field"><span>Couche</span>
+            <select [(ngModel)]="ingestType">
+              <option value="">Détection automatique</option>
+              @for (l of layers; track l) { <option [value]="l">{{ l | lbl: 'layer' }}</option> }
+            </select></label>
+        </div>
         <textarea rows="10" [(ngModel)]="rawLogs" placeholder="2026-09-18 10:00:00 ERROR [payment-service] Connection timeout..."></textarea>
         <div class="actions">
           <button class="btn btn--primary" type="button" [disabled]="ingesting() || !rawLogs.trim()" (click)="ingest()">
@@ -235,4 +297,7 @@
 
 @if (explain(); as req) {
   <app-explain-dialog [request]="req" (closed)="explain.set(null)" />
+}
+@if (jira(); as q) {
+  <app-jira-dialog [query]="q" (closed)="jira.set(null)" />
 }

@@ -5,7 +5,8 @@ import { AuthService } from './auth.service';
 import { ServerEvent } from './models';
 import { ToastService } from './toast.service';
 
-const EVENT_TYPES = ['anomaly.critical', 'vulnerability.critical', 'job.finished', 'tests.completed', 'logs.ingested'];
+const EVENT_TYPES = ['anomaly.critical', 'vulnerability.critical', 'job.finished', 'tests.completed', 'logs.ingested',
+  'validation.application', 'validation.completed', 'validation.decision', 'correction.verified', 'jira.proposed'];
 
 /**
  * Flux temps réel (Server-Sent Events) : notifications de nouvelles anomalies

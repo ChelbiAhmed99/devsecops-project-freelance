@@ -26,6 +26,8 @@ public class TestExecutionSummary {
     private Double lineCoverage;
     private Double branchCoverage;
     private double durationSeconds;
+    /** Application testée (multi-applications). */
+    private String application;
 
     public TestExecutionSummary() {
     }
@@ -83,4 +85,6 @@ public class TestExecutionSummary {
     public void setBranchCoverage(Double branchCoverage) { this.branchCoverage = branchCoverage; }
     public double getDurationSeconds() { return durationSeconds; }
     public void setDurationSeconds(double durationSeconds) { this.durationSeconds = durationSeconds; }
+    public String getApplication() { return application; }
+    public void setApplication(String application) { this.application = application; }
 }

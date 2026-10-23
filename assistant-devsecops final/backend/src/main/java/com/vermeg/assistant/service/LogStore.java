@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
@@ -47,6 +48,22 @@ public class LogStore {
     public List<LogEntry> getAll() {
         List<LogEntry> latest = new ArrayList<>(repository
                 .findAll(PageRequest.of(0, analysisWindow, Sort.by(Sort.Direction.DESC, "timestamp")))
+                .map(LogRecord::toEntry)
+                .getContent());
+        Collections.reverse(latest);
+        return latest;
+    }
+
+    /**
+     * Fenêtre d'analyse d'UNE application : logs rattachés explicitement à son code ou émis
+     * par une des sources qu'elle déclare (robuste à une déclaration de source tardive).
+     */
+    @Transactional(readOnly = true)
+    public List<LogEntry> getForApplication(String applicationCode, Collection<String> sources) {
+        Collection<String> safeSources = sources == null || sources.isEmpty() ? List.of("__aucune_source__") : sources;
+        List<LogEntry> latest = new ArrayList<>(repository
+                .findForApplication(applicationCode, safeSources,
+                        PageRequest.of(0, analysisWindow, Sort.by(Sort.Direction.DESC, "timestamp")))
                 .map(LogRecord::toEntry)
                 .getContent());
         Collections.reverse(latest);

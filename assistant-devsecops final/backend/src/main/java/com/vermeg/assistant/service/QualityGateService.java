@@ -6,6 +6,7 @@
 package com.vermeg.assistant.service;
 
 import com.vermeg.assistant.model.AnomalyGroup;
+import com.vermeg.assistant.model.LogEntry;
 import com.vermeg.assistant.model.ApiDtos;
 import com.vermeg.assistant.model.TestExecutionSummary;
 import com.vermeg.assistant.model.Vulnerability;
@@ -27,6 +28,7 @@ public class QualityGateService {
     private final TestOrchestrationService testService;
     private final LogAnalysisService analysisService;
     private final LogStore logStore;
+    private final ApplicationService applicationService;
 
     @Value("${assistant.quality-gate.max-critical-vulnerabilities:0}")
     private long maxCritical;
@@ -40,25 +42,38 @@ public class QualityGateService {
     private long maxCriticalAnomalies;
 
     public QualityGateService(VulnerabilityService vulnerabilityService, TestOrchestrationService testService,
-                              LogAnalysisService analysisService, LogStore logStore) {
+                              LogAnalysisService analysisService, LogStore logStore,
+                              ApplicationService applicationService) {
         this.vulnerabilityService = vulnerabilityService;
         this.testService = testService;
         this.analysisService = analysisService;
         this.logStore = logStore;
+        this.applicationService = applicationService;
     }
 
     public ApiDtos.QualityGateResult evaluate() {
+        return evaluate(null);
+    }
+
+    /**
+     * Porte qualité d'une application (ou globale si {@code application} est vide) : mêmes
+     * conditions, calculées uniquement sur les tests, vulnérabilités et logs de l'application.
+     * Utilisée par le pipeline CI de chaque application (GET /api/ci/quality-gate?app=...).
+     */
+    public ApiDtos.QualityGateResult evaluate(String application) {
+        boolean scoped = application != null && !application.isBlank();
+        String app = scoped ? applicationService.require(application).getCode() : null;
         List<ApiDtos.GateCondition> conditions = new ArrayList<>();
 
-        long critical = vulnerabilityService.countOpen(Vulnerability.Severity.CRITICAL);
+        long critical = vulnerabilityService.countOpen(app, Vulnerability.Severity.CRITICAL);
         conditions.add(new ApiDtos.GateCondition("Vulnérabilités critiques ouvertes", String.valueOf(critical),
                 "≤ " + maxCritical, critical <= maxCritical));
 
-        long high = vulnerabilityService.countOpen(Vulnerability.Severity.HIGH);
+        long high = vulnerabilityService.countOpen(app, Vulnerability.Severity.HIGH);
         conditions.add(new ApiDtos.GateCondition("Vulnérabilités hautes ouvertes", String.valueOf(high),
                 "≤ " + maxHigh, high <= maxHigh));
 
-        TestExecutionSummary tests = testService.currentResults();
+        TestExecutionSummary tests = testService.currentResults(app);
         if (tests.getTotalTests() > 0) {
             conditions.add(new ApiDtos.GateCondition("Taux de réussite des tests", tests.getSuccessRatePercent() + " %",
                     "≥ " + minSuccessRate + " %", tests.getSuccessRatePercent() >= minSuccessRate));
@@ -72,7 +87,9 @@ public class QualityGateService {
                     "≥ " + minCoverage + " %", cov != null && cov >= minCoverage));
         }
 
-        long criticalAnomalies = analysisService.detectAnomalies(logStore.getAll()).stream()
+        List<LogEntry> logs = scoped
+                ? logStore.getForApplication(app, applicationService.require(app).logSourceSet()) : logStore.getAll();
+        long criticalAnomalies = analysisService.detectAnomalies(logs).stream()
                 .filter(AnomalyGroup::isCritical).count();
         conditions.add(new ApiDtos.GateCondition("Anomalies de logs critiques", String.valueOf(criticalAnomalies),
                 "≤ " + maxCriticalAnomalies, criticalAnomalies <= maxCriticalAnomalies));

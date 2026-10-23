@@ -35,12 +35,18 @@ public class TestExecutionService {
     public record TestRunWindow(LocalDateTime start, LocalDateTime end) { }
 
     public ExecutionResult runTests() {
+        return runTests(projectPath);
+    }
+
+    /** Exécute « mvn test » dans le dossier d'une application donnée (validation multi-applications). */
+    public ExecutionResult runTests(String path) {
+        String target = path == null || path.isBlank() ? projectPath : path;
         LocalDateTime start = LocalDateTime.now();
         try {
             // -Dmaven.test.failure.ignore : on veut les rapports même si des tests échouent
             ProcessRunner.Result r = ProcessRunner.run(
                     List.of(ProcessRunner.mavenCommand(), "-B", "test", "-Dmaven.test.failure.ignore=true"),
-                    Path.of(projectPath).toAbsolutePath().toFile(), timeoutSeconds, true);
+                    Path.of(target).toAbsolutePath().toFile(), timeoutSeconds, true);
             lastRunWindow = new TestRunWindow(start, LocalDateTime.now());
             if (r.timedOut()) {
                 return new ExecutionResult(false, -1, "Timeout : l'exécution des tests a dépassé " + timeoutSeconds + "s");

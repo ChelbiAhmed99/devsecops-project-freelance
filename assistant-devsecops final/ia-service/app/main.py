@@ -6,6 +6,8 @@ Rôle : exposer les API HTTP d'explication, de conversation et d'analyse ML.
 - POST /chat         : copilote conversationnel alimenté par un instantané du projet
 - POST /ml/cluster   : clustering TF-IDF + DBSCAN de messages d'erreur (scikit-learn)
 - POST /ml/outliers  : détection de fenêtres atypiques (IsolationForest)
+- POST /ml/similar   : similarité TF-IDF + cosinus (rapprochement anomalie / tickets Jira)
+- POST /validate/assess : avis CONSULTATIF sur la validation d'une application (borné et contrôlé par le backend)
 - GET  /health       : état et fournisseur actif
 
 Fournisseurs : Groq (LLM, si GROQ_API_KEY est définie) avec repli automatique
@@ -19,10 +21,13 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import heuristics, llm, ml
+from app.validation import coerce_assessment
 from app.llm import _parse_json_response  # noqa: F401  (réexporté : utilisé par les tests historiques)
-from app.prompts import SYSTEM_PROMPT, build_chat_messages, build_user_prompt
+from app.prompts import (SYSTEM_PROMPT, VALIDATION_SYSTEM_PROMPT, build_chat_messages, build_user_prompt,
+                         build_validation_prompt)
 from app.schemas import (ChatRequest, ChatResponse, ClusterRequest, ClusterResponse, IncidentExplanation,
-                         IncidentRequest, Outlier, OutlierRequest, OutlierResponse)
+                         IncidentRequest, Outlier, OutlierRequest, OutlierResponse, SimilarityRequest,
+                         SimilarityResponse, ValidationAssessment, ValidationAssessmentRequest)
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"),
                     format="%(asctime)s %(levelname)s [ia-service] %(name)s : %(message)s")
@@ -53,7 +58,7 @@ def health():
         "provider": "groq" if configured else "heuristic",
         "model": llm.DEFAULT_MODEL if configured else HEURISTIC_MODEL,
         "api_key_configured": configured,
-        "ml": {"clustering": "tfidf-dbscan", "outliers": "isolation-forest"},
+        "ml": {"clustering": "tfidf-dbscan", "outliers": "isolation-forest", "similarity": "tfidf-cosine"},
     }
 
 
@@ -109,3 +114,20 @@ def outliers(request: OutlierRequest):
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return OutlierResponse(outliers=[Outlier(**o) for o in found])
+
+
+@app.post("/ml/similar", response_model=SimilarityResponse)
+def similar(request: SimilarityRequest):
+    return SimilarityResponse(scores=ml.similarity(request.query, request.candidates))
+
+
+@app.post("/validate/assess", response_model=ValidationAssessment)
+def assess_validation(request: ValidationAssessmentRequest):
+    payload = request.model_dump()
+    if llm.is_configured():
+        try:
+            parsed = llm.complete_json(VALIDATION_SYSTEM_PROMPT, build_validation_prompt(payload))
+            return coerce_assessment(parsed, provider="groq", model=llm.DEFAULT_MODEL)
+        except Exception:  # réponse illisible ou LLM indisponible : avis déterministe
+            logger.exception("Avis de validation LLM inexploitable, repli sur le moteur heuristique")
+    return ValidationAssessment(**heuristics.assess_validation(payload), provider="heuristic", model=HEURISTIC_MODEL)

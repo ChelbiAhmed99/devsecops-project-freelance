@@ -31,32 +31,71 @@ public class LogIngestionService {
     private final LogStore logStore;
     private final LogAnalysisService analysisService;
     private final EventService eventService;
+    private final ApplicationService applicationService;
 
     public LogIngestionService(LogParserService parser, LogStore logStore,
-                               LogAnalysisService analysisService, EventService eventService) {
+                               LogAnalysisService analysisService, EventService eventService,
+                               ApplicationService applicationService) {
         this.parser = parser;
         this.logStore = logStore;
         this.analysisService = analysisService;
         this.eventService = eventService;
+        this.applicationService = applicationService;
     }
 
     public ApiDtos.IngestResult ingestText(String raw, String defaultSource) {
+        return ingestText(raw, defaultSource, null, null);
+    }
+
+    /**
+     * @param application code de l'application émettrice (null = déduit de la source, sinon application par défaut)
+     * @param logType     APPLICATION, SERVER ou CICD (null = déduit ligne par ligne)
+     */
+    public ApiDtos.IngestResult ingestText(String raw, String defaultSource, String application, String logType) {
         return ingestStream(new ByteArrayInputStream(raw == null ? new byte[0] : raw.getBytes(StandardCharsets.UTF_8)),
-                defaultSource);
+                defaultSource, application, logType);
     }
 
     public ApiDtos.IngestResult ingestStream(InputStream in, String defaultSource) {
-        LogParserService.ParseResult result = parser.parseWithStats(in);
+        return ingestStream(in, defaultSource, null, null);
+    }
+
+    public ApiDtos.IngestResult ingestStream(InputStream in, String defaultSource, String application, String logType) {
+        String type = normalizeType(logType);
+        LogParserService.ParseResult result = parser.parseWithStats(in, type);
         if (defaultSource != null && !defaultSource.isBlank()) {
-            result.entries().stream().filter(e -> e.getSource() == null || "unknown".equals(e.getSource()))
+            result.entries().stream().filter(e -> e.getSource() == null || "unknown".equals(e.getSource())
+                            || ("ci-pipeline".equals(e.getSource()) && LogTypeClassifier.CICD.equals(type)))
                     .forEach(e -> e.setSource(defaultSource));
         }
+        if (application != null && !application.isBlank()) {
+            String app = applicationService.resolve(application, null);
+            result.entries().forEach(e -> e.setApplication(app));
+        }
         return ingestEntries(result.entries(), result.skippedLines());
+    }
+
+    private static String normalizeType(String logType) {
+        if (logType == null || logType.isBlank()) return null;
+        String t = logType.trim().toUpperCase();
+        if ("CI".equals(t) || "CI_CD".equals(t) || "CI/CD".equals(t) || "PIPELINE".equals(t)) t = LogTypeClassifier.CICD;
+        if ("SERVEUR".equals(t) || "WILDFLY".equals(t) || "JBOSS".equals(t)) t = LogTypeClassifier.SERVER;
+        if ("APP".equals(t) || "APPLICATIF".equals(t)) t = LogTypeClassifier.APPLICATION;
+        if (!LogTypeClassifier.TYPES.contains(t)) {
+            throw new IllegalArgumentException("Type de log invalide : " + logType + " (attendu : APPLICATION, SERVER ou CICD)");
+        }
+        return t;
     }
 
     public synchronized ApiDtos.IngestResult ingestEntries(List<LogEntry> entries, int skipped) {
         if (entries.isEmpty()) {
             return new ApiDtos.IngestResult(0, skipped, logStore.size(), 0);
+        }
+        // Rattachement : application explicite, sinon application déclarant la source, sinon défaut ;
+        // couche : imposée par le parseur ou l'appelant, sinon déduite par règles.
+        for (LogEntry e : entries) {
+            if (e.getApplication() == null) e.setApplication(applicationService.resolve(null, e.getSource()));
+            if (e.getLogType() == null) e.setLogType(LogTypeClassifier.classify(e.getSource(), e.getMessage()));
         }
         Set<String> criticalBefore = criticalKeys();
         logStore.addAll(entries);

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+<testsuite name="com.vermeg.reporting.ExportServiceTest" tests="16" failures="1" errors="0" skipped="0" time="5.44">
+  <testcase name="shouldExportPositionsToCsv" classname="com.vermeg.reporting.ExportServiceTest" time="0.384"/>
+  <testcase name="shouldRejectUnknownCurrency" classname="com.vermeg.reporting.ExportServiceTest" time="0.827">
+    <failure message="Expected IllegalArgumentException to be thrown" type="org.opentest4j.AssertionFailedError">org.opentest4j.AssertionFailedError: Expected IllegalArgumentException to be thrown, but nothing was thrown.</failure>
+  </testcase>
+  <testcase name="shouldExportFormatCase01" classname="com.vermeg.reporting.ExportServiceTest" time="0.456"/>
+  <testcase name="shouldExportFormatCase02" classname="com.vermeg.reporting.ExportServiceTest" time="0.483"/>
+  <testcase name="shouldExportFormatCase03" classname="com.vermeg.reporting.ExportServiceTest" time="0.476"/>
+  <testcase name="shouldExportFormatCase04" classname="com.vermeg.reporting.ExportServiceTest" time="0.027"/>
+  <testcase name="shouldExportFormatCase05" classname="com.vermeg.reporting.ExportServiceTest" time="0.402"/>
+  <testcase name="shouldExportFormatCase06" classname="com.vermeg.reporting.ExportServiceTest" time="0.173"/>
+  <testcase name="shouldExportFormatCase07" classname="com.vermeg.reporting.ExportServiceTest" time="0.013"/>
+  <testcase name="shouldExportFormatCase08" classname="com.vermeg.reporting.ExportServiceTest" time="0.721"/>
+  <testcase name="shouldExportFormatCase09" classname="com.vermeg.reporting.ExportServiceTest" time="0.163"/>
+  <testcase name="shouldExportFormatCase10" classname="com.vermeg.reporting.ExportServiceTest" time="0.431"/>
+  <testcase name="shouldExportFormatCase11" classname="com.vermeg.reporting.ExportServiceTest" time="0.655"/>
+  <testcase name="shouldExportFormatCase12" classname="com.vermeg.reporting.ExportServiceTest" time="0.505"/>
+  <testcase name="shouldExportFormatCase13" classname="com.vermeg.reporting.ExportServiceTest" time="0.3"/>
+  <testcase name="shouldExportFormatCase14" classname="com.vermeg.reporting.ExportServiceTest" time="0.471"/>
+</testsuite>
+<testsuite name="com.vermeg.reporting.ReportingRepositoryIT" tests="16" failures="0" errors="0" skipped="0" time="5.27">
+  <testcase name="shouldLoadDailySnapshot" classname="com.vermeg.reporting.ReportingRepositoryIT" time="0.708"/>
+  <testcase name="shouldQuerySnapshotCase01" classname="com.vermeg.reporting.ReportingRepositoryIT" time="0.104"/>
+  <testcase name="shouldQuerySnapshotCase02" classname="com.vermeg.reporting.ReportingRepositoryIT" time="0.509"/>
+  <testcase name="shouldQuerySnapshotCase03" classname="com.vermeg.reporting.ReportingRepositoryIT" time="0.231"/>
+  <testcase name="shouldQuerySnapshotCase04" classname="com.vermeg.reporting.ReportingRepositoryIT" time="0.256"/>
+  <testcase name="shouldQuerySnapshotCase05" classname="com.vermeg.reporting.ReportingRepositoryIT" time="0.697"/>
+  <testcase name="shouldQuerySnapshotCase06" classname="com.vermeg.reporting.ReportingRepositoryIT" time="0.462"/>
+  <testcase name="shouldQuerySnapshotCase07" classname="com.vermeg.reporting.ReportingRepositoryIT" time="0.51"/>
+  <testcase name="shouldQuerySnapshotCase08" classname="com.vermeg.reporting.ReportingRepositoryIT" time="0.686"/>
+  <testcase name="shouldQuerySnapshotCase09" classname="com.vermeg.reporting.ReportingRepositoryIT" time="0.822"/>
+  <testcase name="shouldQuerySnapshotCase10" classname="com.vermeg.reporting.ReportingRepositoryIT" time="0.404"/>
+  <testcase name="shouldQuerySnapshotCase11" classname="com.vermeg.reporting.ReportingRepositoryIT" time="0.555"/>
+  <testcase name="shouldQuerySnapshotCase12" classname="com.vermeg.reporting.ReportingRepositoryIT" time="0.46"/>
+  <testcase name="shouldQuerySnapshotCase13" classname="com.vermeg.reporting.ReportingRepositoryIT" time="0.466"/>
+  <testcase name="shouldQuerySnapshotCase14" classname="com.vermeg.reporting.ReportingRepositoryIT" time="0.627"/>
+  <testcase name="shouldQuerySnapshotCase15" classname="com.vermeg.reporting.ReportingRepositoryIT" time="0.413"/>
+</testsuite>
+<testsuite name="com.vermeg.reporting.AmountFormatterTest" tests="16" failures="0" errors="0" skipped="0" time="7.27">
+  <testcase name="shouldFormatAmountCase01" classname="com.vermeg.reporting.AmountFormatterTest" time="0.435"/>
+  <testcase name="shouldFormatAmountCase02" classname="com.vermeg.reporting.AmountFormatterTest" time="0.848"/>
+  <testcase name="shouldFormatAmountCase03" classname="com.vermeg.reporting.AmountFormatterTest" time="0.632"/>
+  <testcase name="shouldFormatAmountCase04" classname="com.vermeg.reporting.AmountFormatterTest" time="0.79"/>
+  <testcase name="shouldFormatAmountCase05" classname="com.vermeg.reporting.AmountFormatterTest" time="0.849"/>
+  <testcase name="shouldFormatAmountCase06" classname="com.vermeg.reporting.AmountFormatterTest" time="0.241"/>
+  <testcase name="shouldFormatAmountCase07" classname="com.vermeg.reporting.AmountFormatterTest" time="0.508"/>
+  <testcase name="shouldFormatAmountCase08" classname="com.vermeg.reporting.AmountFormatterTest" time="0.85"/>
+  <testcase name="shouldFormatAmountCase09" classname="com.vermeg.reporting.AmountFormatterTest" time="0.758"/>
+  <testcase name="shouldFormatAmountCase10" classname="com.vermeg.reporting.AmountFormatterTest" time="0.132"/>
+  <testcase name="shouldFormatAmountCase11" classname="com.vermeg.reporting.AmountFormatterTest" time="0.118"/>
+  <testcase name="shouldFormatAmountCase12" classname="com.vermeg.reporting.AmountFormatterTest" time="0.403"/>
+  <testcase name="shouldFormatAmountCase13" classname="com.vermeg.reporting.AmountFormatterTest" time="0.075"/>
+  <testcase name="shouldFormatAmountCase14" classname="com.vermeg.reporting.AmountFormatterTest" time="0.224"/>
+  <testcase name="shouldFormatAmountCase15" classname="com.vermeg.reporting.AmountFormatterTest" time="0.075"/>
+  <testcase name="shouldFormatAmountCase16" classname="com.vermeg.reporting.AmountFormatterTest" time="0.606"/>
+</testsuite>
+</testsuites>

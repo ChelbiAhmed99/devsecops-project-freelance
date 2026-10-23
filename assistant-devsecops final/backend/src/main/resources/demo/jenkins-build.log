@@ -1,0 +1,19 @@
+Started by GitLab push by dev
+[Pipeline] Start of Pipeline
+[Pipeline] stage
+[Pipeline] { (Build & tests)
+[2026-09-18T09:58:01.102Z] + mvn -B verify
+[2026-09-18T09:58:04.551Z] [INFO] Scanning for projects...
+[2026-09-18T09:58:05.020Z] [INFO] Building api-reporting 2.4.0-SNAPSHOT
+[2026-09-18T09:58:31.774Z] [INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ api-reporting ---
+[2026-09-18T09:59:12.008Z] [ERROR] Tests run: 48, Failures: 2, Errors: 1, Skipped: 0, Time elapsed: 39.1 s <<< FAILURE! - in com.vermeg.reporting.ExportServiceTest
+[2026-09-18T09:59:12.010Z] [ERROR] ExportServiceTest.shouldExportPositionsToCsv:84 expected: <1240> but was: <0>
+[2026-09-18T09:59:12.012Z] [ERROR] ExportServiceTest.shouldRejectUnknownCurrency:112 Expected IllegalArgumentException to be thrown
+[2026-09-18T09:59:12.014Z] [ERROR] ReportingRepositoryIT.shouldLoadDailySnapshot:57 » DataAccessResourceFailure Unable to acquire JDBC Connection
+[2026-09-18T09:59:12.300Z] [ERROR] There are test failures.
+[2026-09-18T09:59:12.402Z] [INFO] BUILD FAILURE
+[2026-09-18T09:59:12.405Z] [ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.5:test (default-test) on project api-reporting: There are test failures.
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] End of Pipeline
+Finished: FAILURE

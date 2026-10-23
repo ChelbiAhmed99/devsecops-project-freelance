@@ -58,8 +58,29 @@ public class LogQueryService {
     @Transactional(readOnly = true)
     public ApiDtos.LogPage search(String level, String source, String query, LocalDateTime from,
                                   LocalDateTime to, int page, int size) {
+        return search(level, source, query, from, to, page, size, null, null);
+    }
+
+    /**
+     * Recherche multicritère ; {@code logType} : APPLICATION | SERVER | CICD (séparés par des virgules),
+     * {@code application} : code d'application. Les logs antérieurs à la classification par couche
+     * (logType nul) sont traités comme APPLICATION.
+     */
+    @Transactional(readOnly = true)
+    public ApiDtos.LogPage search(String level, String source, String query, LocalDateTime from,
+                                  LocalDateTime to, int page, int size, String logType, String application) {
         Specification<LogRecord> spec = (root, cq, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
+            if (logType != null && !logType.isBlank()) {
+                List<String> types = new ArrayList<>();
+                for (String t : logType.split(",")) types.add(t.trim().toUpperCase(Locale.ROOT));
+                Predicate typed = root.get("logType").in(types);
+                predicates.add(types.contains(LogTypeClassifier.APPLICATION)
+                        ? cb.or(typed, cb.isNull(root.get("logType"))) : typed);
+            }
+            if (application != null && !application.isBlank()) {
+                predicates.add(cb.equal(root.get("applicationCode"), application.trim()));
+            }
             if (level != null && !level.isBlank()) {
                 List<LogEntry.LogLevel> levels = new ArrayList<>();
                 for (String l : level.split(",")) {
@@ -120,6 +141,25 @@ public class LogQueryService {
 
     public List<String> sources() {
         return repository.distinctSources();
+    }
+
+    /** Volumes par couche (applicatif / serveur / CI) et par application. */
+    @Transactional(readOnly = true)
+    public Map<String, Object> breakdown() {
+        Map<String, Long> byType = new LinkedHashMap<>();
+        LogTypeClassifier.TYPES.forEach(t -> byType.put(t, 0L));
+        for (Object[] row : repository.countByLogType()) {
+            String type = row[0] == null ? LogTypeClassifier.APPLICATION : String.valueOf(row[0]);
+            byType.merge(type, ((Number) row[1]).longValue(), Long::sum);
+        }
+        Map<String, Long> byApplication = new LinkedHashMap<>();
+        for (Object[] row : repository.countByApplication()) {
+            byApplication.put(row[0] == null ? "(non rattaché)" : String.valueOf(row[0]), ((Number) row[1]).longValue());
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("byType", byType);
+        result.put("byApplication", byApplication);
+        return result;
     }
 
     public AnomalyResult anomalies(String engine) {

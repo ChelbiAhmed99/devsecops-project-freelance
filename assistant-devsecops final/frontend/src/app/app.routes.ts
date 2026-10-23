@@ -18,6 +18,21 @@ export const routes: Routes = [
         loadComponent: () => import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent),
       },
       {
+        path: 'applications',
+        title: 'Applications',
+        loadComponent: () => import('./features/applications/applications.component').then((m) => m.ApplicationsComponent),
+      },
+      {
+        path: 'validation',
+        title: 'Validation',
+        loadComponent: () => import('./features/validation/validation.component').then((m) => m.ValidationComponent),
+      },
+      {
+        path: 'validation/report/:id',
+        title: 'Rapport de validation',
+        loadComponent: () => import('./features/validation/validation-report.component').then((m) => m.ValidationReportComponent),
+      },
+      {
         path: 'logs',
         title: 'Logs',
         loadComponent: () => import('./features/logs/logs.component').then((m) => m.LogsComponent),

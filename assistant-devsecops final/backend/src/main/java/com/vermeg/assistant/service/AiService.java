@@ -9,9 +9,11 @@ import com.vermeg.assistant.model.AiRecommendation;
 import com.vermeg.assistant.model.AnomalyGroup;
 import com.vermeg.assistant.model.ApiDtos;
 import com.vermeg.assistant.model.CorrelatedFailure;
+import com.vermeg.assistant.model.Diagnostics;
 import com.vermeg.assistant.model.TestExecutionSummary;
 import com.vermeg.assistant.model.Vulnerability;
 import com.vermeg.assistant.security.CurrentUser;
+import com.vermeg.assistant.service.validation.ValidationService;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -42,11 +44,16 @@ public class AiService {
     private final QualityGateService qualityGateService;
     private final TestRunHistoryService historyService;
     private final JobService jobService;
+    private final DiagnosticService diagnosticService;
+    private final ApplicationService applicationService;
+    private final ValidationService validationService;
 
     public AiService(AiClient aiClient, AiRecommendationStore store, AuditService auditService,
                      LogQueryService logQueryService, TestOrchestrationService testService,
                      VulnerabilityService vulnerabilityService, QualityGateService qualityGateService,
-                     TestRunHistoryService historyService, JobService jobService) {
+                     TestRunHistoryService historyService, JobService jobService,
+                     DiagnosticService diagnosticService, ApplicationService applicationService,
+                     ValidationService validationService) {
         this.aiClient = aiClient;
         this.store = store;
         this.auditService = auditService;
@@ -56,6 +63,9 @@ public class AiService {
         this.qualityGateService = qualityGateService;
         this.historyService = historyService;
         this.jobService = jobService;
+        this.diagnosticService = diagnosticService;
+        this.applicationService = applicationService;
+        this.validationService = validationService;
     }
 
     public AiRecommendation explain(ApiDtos.ExplainRequest request) {
@@ -72,8 +82,18 @@ public class AiService {
                 return cached.get();
             }
         }
+        // Analyse d'origine : le diagnostic déterministe (corrélation multi-couches) est fourni à l'IA,
+        // qui explique et propose une correction à partir de faits établis plutôt que de suppositions.
+        String application = request.application() == null || request.application().isBlank() ? null
+                : applicationService.find(request.application()).map(a -> a.getCode()).orElse(null);
+        String diagnostic = diagnose(type, request.incidentRef(), application);
+        String extraContext = request.extraContext();
+        if (diagnostic != null) {
+            extraContext = (extraContext == null || extraContext.isBlank() ? "" : extraContext + "\n")
+                    + "Diagnostic de corrélation (déterministe) : " + diagnostic;
+        }
         AiClient.AiExplanationResult result = aiClient.explain(type, request.source(), request.message(),
-                request.occurrences(), request.extraContext(), Boolean.TRUE.equals(request.force()));
+                request.occurrences(), truncate(extraContext, 7900), Boolean.TRUE.equals(request.force()));
         if (!result.success()) {
             throw new AiUnavailableException(result.errorMessage());
         }
@@ -85,6 +105,8 @@ public class AiService {
         recommendation.setProvider(result.provider());
         recommendation.setModel(result.model());
         recommendation.setCreatedBy(CurrentUser.username());
+        recommendation.setApplicationCode(application);
+        recommendation.setDiagnostic(diagnostic);
         if (Boolean.TRUE.equals(request.force())) {
             // Régénération : la nouvelle fiche remplace l'ancienne en attente (les fiches déjà revues sont conservées)
             store.deletePendingByIncidentRef(request.incidentRef());
@@ -93,6 +115,45 @@ public class AiService {
         auditService.record("AI_EXPLAIN", type + (request.incidentRef() == null ? "" : " " + request.incidentRef()),
                 "fournisseur=" + result.provider());
         return recommendation;
+    }
+
+    /**
+     * Origine probable d'un incident d'après le moteur de corrélation : l'anomalie est-elle la cause
+     * racine d'un incident, ou la conséquence d'une autre défaillance ? Null si rien de concluant.
+     */
+    public String diagnose(String type, String incidentRef, String application) {
+        if (incidentRef == null || incidentRef.isBlank() || "vulnerability".equals(type)) return null;
+        try {
+            for (Diagnostics.CorrelatedIncident incident : diagnosticService.incidents(application)) {
+                Diagnostics.RootCauseCandidate root = incident.rootCause();
+                boolean isSignal = incident.signals().stream().anyMatch(s -> incidentRef.equals(s.key()));
+                boolean isImpactedTest = incident.impactedTests().contains(incidentRef);
+                if (!isSignal && !isImpactedTest) continue;
+                StringBuilder sb = new StringBuilder();
+                if (incidentRef.equals(root.signal().key())) {
+                    sb.append("cet incident est la CAUSE RACINE probable (confiance ").append(root.confidencePercent())
+                            .append(" %) d'une rafale de ").append(incident.eventCount()).append(" erreurs sur les couches ")
+                            .append(String.join(", ", incident.layers())).append(". ");
+                } else {
+                    sb.append("cet incident est probablement une CONSÉQUENCE de : [").append(LogTypeClassifier.label(root.signal().layer()))
+                            .append("] ").append(truncate(root.signal().message(), 200)).append(" (confiance ")
+                            .append(root.confidencePercent()).append(" %). ");
+                }
+                sb.append(root.rationale());
+                if (!incident.chain().isEmpty()) {
+                    sb.append(" Chaîne : ").append(incident.chain().stream().limit(3)
+                            .map(c -> truncate(c.fromLabel(), 80) + " → " + truncate(c.toLabel(), 80))
+                            .collect(java.util.stream.Collectors.joining(" ; "))).append('.');
+                }
+                if (!incident.impactedTests().isEmpty()) {
+                    sb.append(" Tests impactés : ").append(String.join(", ", incident.impactedTests())).append('.');
+                }
+                return truncate(sb.toString(), 3000);
+            }
+        } catch (RuntimeException e) {
+            // le diagnostic enrichit l'explication mais ne doit jamais la bloquer
+        }
+        return null;
     }
 
     public AiRecommendation review(String id, ApiDtos.ReviewRequest request) {
@@ -243,6 +304,27 @@ public class AiService {
             Map<String, Long> byComponent = new java.util.TreeMap<>();
             vulns.forEach(v -> byComponent.merge(String.valueOf(v.getAffectedComponent()), 1L, Long::sum));
             sb.append("- Composants les plus touchés : ").append(topMap(byComponent, 8)).append('\n');
+        });
+
+        // ---- Validation multi-applications
+        section(sb, "Validation des applications (dernière décision par application)", () -> {
+            ApiDtos.PortfolioSummary portfolio = validationService.portfolio();
+            sb.append("- ").append(portfolio.applications()).append(" application(s) : ").append(portfolio.validated()).append(" validée(s), ")
+                    .append(portfolio.reserves()).append(" avec réserves, ").append(portfolio.rejected()).append(" rejetée(s), ")
+                    .append(portfolio.inconclusive()).append(" non concluante(s), ").append(portfolio.neverValidated())
+                    .append(" jamais validée(s) ; revues humaines en attente : ").append(portfolio.pendingReviews()).append('\n');
+            portfolio.entries().forEach(e -> {
+                sb.append("  - ").append(e.application().name()).append(" (").append(e.application().code()).append(", criticité ")
+                        .append(e.application().criticality()).append(")");
+                if (e.lastValidation() == null) {
+                    sb.append(" : jamais validée\n");
+                } else {
+                    ApiDtos.ApplicationValidationSummary v = e.lastValidation();
+                    sb.append(" : ").append(v.finalVerdict()).append(", score ").append(v.score()).append("/100")
+                            .append(v.reviewRequired() && v.humanDecision() == null ? ", revue humaine requise" : "")
+                            .append(v.finishedAt() != null ? ", le " + v.finishedAt().format(TS) : "").append('\n');
+                }
+            });
         });
 
         // ---- IA, activité

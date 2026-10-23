@@ -6,6 +6,7 @@
 package com.vermeg.assistant.repository;
 
 import com.vermeg.assistant.domain.AiRecommendationRecord;
+import com.vermeg.assistant.model.AiRecommendation;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -15,5 +16,9 @@ public interface AiRecommendationRepository extends JpaRepository<AiRecommendati
     List<AiRecommendationRecord> findByIncidentRefOrderByCreatedAtDesc(String incidentRef);
 
     List<AiRecommendationRecord> findByIncidentRefAndStatus(String incidentRef,
-            com.vermeg.assistant.model.AiRecommendation.ValidationStatus status);
+            AiRecommendation.ValidationStatus status);
+
+    List<AiRecommendationRecord> findByFixStatus(AiRecommendation.FixStatus fixStatus);
+
+    long countByStatus(AiRecommendation.ValidationStatus status);
 }

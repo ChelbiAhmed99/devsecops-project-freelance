@@ -3,18 +3,23 @@ import { FormsModule } from '@angular/forms';
 import { ApiService, LogSearch, errorMessage } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { shortTime } from '../../core/format';
-import { AnomalyGroup, ExplainRequest, LogPage, LogStats, SpikeReport } from '../../core/models';
+import {
+  AnomalyGroup, ApplicationView, CorrelatedIncident, ExplainRequest, JiraIncidentQuery, LogBreakdown, LogPage, LogStats, LogType,
+  SpikeReport,
+} from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { BarChartComponent, BarDatum } from '../../shared/charts';
 import { ExplainDialogComponent } from '../../shared/explain-dialog.component';
+import { IncidentCardComponent } from '../../shared/incident-card.component';
+import { JiraDialogComponent } from '../../shared/jira-dialog.component';
 import { SHARED_PIPES } from '../../shared/pipes';
 
-type Tab = 'anomalies' | 'spikes' | 'explorer' | 'ingest';
+type Tab = 'anomalies' | 'incidents' | 'spikes' | 'explorer' | 'ingest';
 
 @Component({
   selector: 'app-logs',
   standalone: true,
-  imports: [FormsModule, BarChartComponent, ExplainDialogComponent, ...SHARED_PIPES],
+  imports: [FormsModule, BarChartComponent, ExplainDialogComponent, IncidentCardComponent, JiraDialogComponent, ...SHARED_PIPES],
   templateUrl: './logs.component.html',
 })
 export class LogsComponent implements OnInit {
@@ -35,15 +40,27 @@ export class LogsComponent implements OnInit {
   readonly explain = signal<ExplainRequest | null>(null);
   readonly categoryFilter = signal<string>('');
   readonly onlyCritical = signal(false);
+  readonly layerFilter = signal<LogType | ''>('');
+  readonly incidents = signal<CorrelatedIncident[]>([]);
+  readonly incidentsApp = signal<string>('');
+  readonly loadingIncidents = signal(false);
+  readonly applications = signal<ApplicationView[]>([]);
+  readonly breakdown = signal<LogBreakdown | null>(null);
+  readonly jira = signal<JiraIncidentQuery | null>(null);
+  readonly layers: LogType[] = ['APPLICATION', 'SERVER', 'CICD'];
+  ingestApp = '';
+  ingestType: LogType | '' = '';
 
-  search: LogSearch = { level: '', source: '', q: '', page: 0, size: 50 };
+  search: LogSearch = { level: '', source: '', q: '', page: 0, size: 50, logType: '', app: '' };
   rawLogs = '';
   ingestSource = '';
   ingesting = signal(false);
 
   readonly categories = computed(() => [...new Set(this.anomalies().map((a) => a.category))].sort());
   readonly filteredAnomalies = computed(() => this.anomalies().filter((a) =>
-    (!this.categoryFilter() || a.category === this.categoryFilter()) && (!this.onlyCritical() || a.critical)));
+    (!this.categoryFilter() || a.category === this.categoryFilter()) && (!this.onlyCritical() || a.critical)
+    && (!this.layerFilter() || (a.logType ?? 'APPLICATION') === this.layerFilter())));
+  readonly layerEntries = computed(() => Object.entries(this.breakdown()?.byType ?? {}).filter(([, n]) => n > 0));
 
   readonly timelineBars = computed<BarDatum[]>(() => (this.stats()?.timeline ?? []).map((b) => ({
     label: shortTime(b.start), values: [b.total - b.errors, b.errors],
@@ -69,6 +86,11 @@ export class LogsComponent implements OnInit {
   refresh(): void {
     this.api.logStats().subscribe({ next: (s) => this.stats.set(s), error: (e) => this.toasts.error('Statistiques indisponibles', errorMessage(e)) });
     this.api.logSources().subscribe((s) => this.sources.set(s));
+    this.api.logBreakdown().subscribe({ next: (b) => this.breakdown.set(b), error: () => this.breakdown.set(null) });
+    if (!this.applications().length) {
+      this.api.applications().subscribe({ next: (a) => this.applications.set(a), error: () => undefined });
+    }
+    if (this.tab() === 'incidents') this.loadIncidents();
     this.loadAnomalies();
     if (this.tab() === 'spikes') this.loadSpikes();
     if (this.tab() === 'explorer') this.runSearch();
@@ -77,6 +99,7 @@ export class LogsComponent implements OnInit {
   selectTab(tab: Tab): void {
     this.tab.set(tab);
     if (tab === 'spikes' && !this.spikes()) this.loadSpikes();
+    if (tab === 'incidents') this.loadIncidents();
     if (tab === 'explorer' && !this.page()) this.runSearch();
   }
 
@@ -102,6 +125,42 @@ export class LogsComponent implements OnInit {
         this.toasts.error('Anomalies indisponibles', errorMessage(e));
       },
     });
+  }
+
+  loadIncidents(): void {
+    this.loadingIncidents.set(true);
+    this.api.incidents(this.incidentsApp() || null).subscribe({
+      next: (i) => {
+        this.incidents.set(i);
+        this.loadingIncidents.set(false);
+      },
+      error: (e) => {
+        this.loadingIncidents.set(false);
+        this.toasts.error('Incidents indisponibles', errorMessage(e));
+      },
+    });
+  }
+
+  setIncidentsApp(app: string): void {
+    this.incidentsApp.set(app);
+    this.loadIncidents();
+  }
+
+  explainIncident(i: CorrelatedIncident): void {
+    const root = i.rootCause.signal;
+    this.explain.set({
+      incidentType: 'log_anomaly', source: root.source, message: root.message, occurrences: root.occurrences,
+      extraContext: i.summary.slice(0, 2000), incidentRef: root.key, application: this.incidentsApp() || null,
+    });
+  }
+
+  jiraIncident(i: CorrelatedIncident): void {
+    this.jira.set({ application: this.incidentsApp() || null, incidentType: 'incident', incidentRef: i.rootCause.signal.key,
+      text: i.rootCause.signal.message + '\n' + i.summary });
+  }
+
+  jiraAnomaly(a: AnomalyGroup): void {
+    this.jira.set({ incidentType: 'log_anomaly', incidentRef: a.key, text: a.normalizedMessage });
   }
 
   loadSpikes(): void {
@@ -141,7 +200,7 @@ export class LogsComponent implements OnInit {
   ingest(): void {
     if (!this.rawLogs.trim()) return;
     this.ingesting.set(true);
-    this.api.ingestLogs(this.rawLogs, this.ingestSource || undefined).subscribe({
+    this.api.ingestLogs(this.rawLogs, this.ingestSource || undefined, this.ingestApp || undefined, this.ingestType).subscribe({
       next: (r) => this.afterIngest(r.ingested, r.skippedLines, r.criticalAnomalies),
       error: (e) => {
         this.ingesting.set(false);
@@ -154,7 +213,7 @@ export class LogsComponent implements OnInit {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) return;
     this.ingesting.set(true);
-    this.api.uploadLogs(file, this.ingestSource || undefined).subscribe({
+    this.api.uploadLogs(file, this.ingestSource || undefined, this.ingestApp || undefined, this.ingestType).subscribe({
       next: (r) => this.afterIngest(r.ingested, r.skippedLines, r.criticalAnomalies),
       error: (e) => {
         this.ingesting.set(false);

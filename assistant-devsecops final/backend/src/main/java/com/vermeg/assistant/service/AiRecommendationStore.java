@@ -83,6 +83,11 @@ public class AiRecommendationStore {
         return true;
     }
 
+    @Transactional(readOnly = true)
+    public List<AiRecommendation> findByFixStatus(AiRecommendation.FixStatus fixStatus) {
+        return repository.findByFixStatus(fixStatus).stream().map(AiRecommendationRecord::toModel).toList();
+    }
+
     public long count(AiRecommendation.ValidationStatus status) {
         return repository.findAll().stream().filter(r -> r.getStatus() == status).count();
     }

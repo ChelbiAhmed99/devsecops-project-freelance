@@ -8,6 +8,7 @@ package com.vermeg.assistant.controller;
 import com.vermeg.assistant.model.ApiDtos;
 import com.vermeg.assistant.model.CorrelatedFailure;
 import com.vermeg.assistant.model.TestExecutionSummary;
+import com.vermeg.assistant.service.ApplicationService;
 import com.vermeg.assistant.service.JobService;
 import com.vermeg.assistant.service.TestOrchestrationService;
 import com.vermeg.assistant.service.TestRunHistoryService;
@@ -44,10 +45,13 @@ public class TestController {
 
     private final TestOrchestrationService testService;
     private final TestRunHistoryService historyService;
+    private final ApplicationService applicationService;
 
-    public TestController(TestOrchestrationService testService, TestRunHistoryService historyService) {
+    public TestController(TestOrchestrationService testService, TestRunHistoryService historyService,
+                          ApplicationService applicationService) {
         this.testService = testService;
         this.historyService = historyService;
+        this.applicationService = applicationService;
     }
 
     @PostMapping("/run")
@@ -59,14 +63,16 @@ public class TestController {
     public TestExecutionSummary importReports(@RequestPart("reports") List<MultipartFile> reports,
                                               @RequestPart(value = "coverage", required = false) MultipartFile coverage,
                                               @RequestParam(required = false) String branch,
-                                              @RequestParam(required = false) String commit) throws Exception {
+                                              @RequestParam(required = false) String commit,
+                                              @RequestParam(required = false) String app) throws Exception {
         return testService.importReports(reports, coverage,
-                new TestRunHistoryService.RunMetadata("IMPORT", branch, commit, null, null, null, null, null));
+                new TestRunHistoryService.RunMetadata("IMPORT", branch, commit, null, null, null, null, null,
+                        app == null || app.isBlank() ? null : applicationService.resolve(app, null)));
     }
 
     @GetMapping("/results")
-    public TestExecutionSummary getResults() {
-        return testService.currentResults();
+    public TestExecutionSummary getResults(@RequestParam(required = false) String app) {
+        return testService.currentResults(app);
     }
 
     @GetMapping("/runs/{id}")
@@ -75,13 +81,14 @@ public class TestController {
     }
 
     @GetMapping("/history")
-    public List<ApiDtos.TestRunPoint> history(@RequestParam(defaultValue = "20") int limit) {
-        return historyService.history(limit);
+    public List<ApiDtos.TestRunPoint> history(@RequestParam(defaultValue = "20") int limit,
+                                             @RequestParam(required = false) String app) {
+        return historyService.history(app, limit);
     }
 
     @GetMapping("/flaky")
-    public List<ApiDtos.FlakyTest> flaky() {
-        return historyService.flakyTests();
+    public List<ApiDtos.FlakyTest> flaky(@RequestParam(required = false) String app) {
+        return historyService.flakyTests(app);
     }
 
     @GetMapping("/failures/correlated")

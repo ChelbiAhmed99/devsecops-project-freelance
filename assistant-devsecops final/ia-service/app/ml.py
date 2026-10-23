@@ -5,6 +5,8 @@ Rôle : regrouper les messages d'erreur et détecter les fenêtres temporelles a
 - cluster_messages : regroupement sémantique de messages d'erreur normalisés
   (TF-IDF sur mots + n-grammes de caractères, DBSCAN en distance cosinus).
   Plus robuste que la similarité de Jaccard aux variations de formulation.
+- similarity : similarité cosinus TF-IDF entre un texte et des candidats
+  (rapprochement d'une anomalie avec des tickets Jira existants).
 - detect_outliers : détection de fenêtres temporelles atypiques
   (IsolationForest sur des vecteurs [erreurs, warnings, volume, messages
   distincts, services en erreur], standardisés).
@@ -66,3 +68,23 @@ def detect_outliers(labels: list[str], features: list[list[float]], contaminatio
               for i in range(len(labels)) if predictions[i] == -1 and scores[i] >= min_score]
     result.sort(key=lambda item: item["score"], reverse=True)
     return result
+
+
+def similarity(query: str, candidates: list[str]) -> list[float]:
+    """Similarité cosinus (0-1) entre la requête et chaque candidat, TF-IDF mots + n-grammes de caractères."""
+    if not candidates:
+        return []
+    texts = [query.lower().replace("#", " ")] + [c.lower().replace("#", " ") for c in candidates]
+    blocks = []
+    for vectorizer in (TfidfVectorizer(token_pattern=r"(?u)\b[a-zA-Z_][a-zA-Z0-9_.-]+\b", sublinear_tf=True),
+                       TfidfVectorizer(analyzer="char_wb", ngram_range=(3, 5), sublinear_tf=True)):
+        try:
+            blocks.append(vectorizer.fit_transform(texts))
+        except ValueError:
+            continue
+    if not blocks:
+        return [0.0 for _ in candidates]
+    matrix = hstack(blocks).tocsr()
+    # Les lignes TF-IDF sont normalisées L2 par bloc : le produit scalaire / nb de blocs est un cosinus.
+    scores = (matrix[1:] @ matrix[0].T).toarray().ravel() / len(blocks)
+    return [round(float(min(1.0, max(0.0, v))), 4) for v in scores]

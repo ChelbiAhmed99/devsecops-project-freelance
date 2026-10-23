@@ -53,3 +53,25 @@ def test_chat_endpoint():
                                       "context": "## Vulnérabilités ouvertes (1)\n- CVE-1 [HIGH]\n"}).json()
     assert body["provider"] == "heuristic"
     assert "CVE-1" in body["answer"]
+
+
+def test_validate_assess_falls_back_to_heuristic_and_stays_grounded():
+    payload = {
+        "application": {"code": "titres", "name": "Back-office Titres", "criticality": "HIGH"},
+        "deterministic": {"verdict": "VALIDATED_WITH_RESERVES", "score": 72.4, "confidence": 0.87, "blocking": []},
+        "criteria": [{"code": "LOG_HEALTH", "label": "Santé des logs", "status": "WARN", "measured": "3 anomalies", "threshold": "≤ 3"}],
+        "tests": {"new_failures": ["test:A#b"]},
+        "incidents": [{"id": "incident-0123456789abcdef", "severity": "CRITICAL", "root_cause": "IJ000453", "confidence": 88}],
+        "anomalies": [], "vulnerabilities": [],
+        "allowed_refs": ["LOG_HEALTH", "test:A#b", "incident-0123456789abcdef"],
+    }
+    body = client.post("/validate/assess", json=payload).json()
+    assert body["provider"] == "heuristic"
+    assert body["opinion"] == "RESERVES"
+    assert set(body["cited_refs"]) <= set(payload["allowed_refs"])
+
+
+def test_similar_endpoint_scores_each_candidate():
+    body = client.post("/ml/similar", json={"query": "Unable to acquire JDBC Connection",
+                                             "candidates": ["JDBC connection pool exhausted", "Bouton mal aligné"]}).json()
+    assert len(body["scores"]) == 2 and body["scores"][0] > body["scores"][1]

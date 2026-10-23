@@ -29,6 +29,8 @@ export class ShellComponent implements OnInit, OnDestroy {
 
   readonly nav: NavItem[] = [
     { path: '/dashboard', label: 'Tableau de bord', icon: 'M3 3h6v8H3zM11 3h6v5h-6zM11 10h6v7h-6zM3 13h6v4H3z' },
+    { path: '/validation', label: 'Validation', icon: 'M4 10.5l3.5 3.5L16 5.5M3 17h14' },
+    { path: '/applications', label: 'Applications', icon: 'M3 4h6v5H3zM11 4h6v5h-6zM3 11h6v5H3zM11 11h6v5h-6z' },
     { path: '/logs', label: 'Logs', icon: 'M3 5h14M3 10h10M3 15h12' },
     { path: '/tests', label: 'Tests', icon: 'M10 2.8a7.2 7.2 0 1 0 0 14.4a7.2 7.2 0 1 0 0-14.4M6.5 10l2.3 2.3l4.7-4.8' },
     { path: '/security', label: 'Sécurité', icon: 'M10 2.3l6.3 2.5v4.6c0 3.9-2.7 7-6.3 7.9c-3.6-.9-6.3-4-6.3-7.9V4.8z' },

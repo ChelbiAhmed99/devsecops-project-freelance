@@ -24,7 +24,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -167,19 +169,52 @@ public class LogAnalysisService {
         group.setCategory(AnomalyCategorizer.categorize(representativeMessage, stack));
         group.setFirstSeen(first);
         group.setLastSeen(last);
+        // Couches touchées (applicatif / serveur / CI) et couche dominante.
+        Map<String, Long> layers = occurrences.stream()
+                .collect(Collectors.groupingBy(LogTypeClassifier::classify, TreeMap::new, Collectors.counting()));
+        group.setLayers(new TreeSet<>(layers.keySet()));
+        group.setLogType(layers.entrySet().stream().max(Map.Entry.comparingByValue()).map(Map.Entry::getKey)
+                .orElse(LogTypeClassifier.APPLICATION));
+        LogTypeClassifier.errorCode(representativeMessage).ifPresent(group::setErrorCode);
         group.setSummary(summaryService.summarize(group));
         return group;
     }
 
-    /** Remplace les parties variables d'un message par des marqueurs génériques. */
+    /**
+     * Remplace les parties variables d'un message par des marqueurs génériques.
+     * Les codes d'erreur des serveurs et bases (WFLYCTL0013, IJ000453, ARJUNA012117, ORA-00942...)
+     * sont préservés : ils identifient précisément le problème et ne doivent pas être fusionnés.
+     */
     public static String normalize(String message) {
         if (message == null) return "";
-        String msg = UUID_PATTERN.matcher(message).replaceAll("#uuid#");
+        List<String> codes = new ArrayList<>();
+        Matcher codeMatcher = LogTypeClassifier.errorCodePattern().matcher(message);
+        StringBuilder protectedMsg = new StringBuilder();
+        while (codeMatcher.find()) {
+            codeMatcher.appendReplacement(protectedMsg, Matcher.quoteReplacement("\u00a7" + placeholder(codes.size()) + "\u00a7"));
+            codes.add(codeMatcher.group(1));
+        }
+        codeMatcher.appendTail(protectedMsg);
+        String msg = UUID_PATTERN.matcher(protectedMsg.toString()).replaceAll("#uuid#");
         msg = EMAIL_PATTERN.matcher(msg).replaceAll("#email#");
         msg = IP_PATTERN.matcher(msg).replaceAll("#ip#");
         msg = HEX_PATTERN.matcher(msg).replaceAll("#hex#");
         msg = NUMBERS_PATTERN.matcher(msg).replaceAll("#");
+        for (int i = 0; i < codes.size(); i++) {
+            msg = msg.replace("\u00a7" + placeholder(i) + "\u00a7", codes.get(i));
+        }
         return msg.trim();
+    }
+
+    /** Marqueur sans chiffre (sinon il serait lui-même remplacé par #) : a, b, ..., z, ba, bb... */
+    private static String placeholder(int index) {
+        StringBuilder sb = new StringBuilder();
+        int i = index;
+        do {
+            sb.insert(0, (char) ('a' + i % 26));
+            i /= 26;
+        } while (i > 0);
+        return sb.toString();
     }
 
     public static String keyOf(String normalizedMessage) {

@@ -74,6 +74,14 @@ services:
       TRIVY_IMAGE: assistant-devsecops-backend:${IMAGE_TAG:-latest}
       LOKI_ENABLED: ${LOKI_ENABLED:-false}
       LOKI_URL: http://loki:3100
+      # Intégration Jira (optionnelle : sans URL ni jeton, mode simulation tracé)
+      JIRA_ENABLED: ${JIRA_ENABLED:-false}
+      JIRA_BASE_URL: ${JIRA_BASE_URL:-}
+      JIRA_DEPLOYMENT: ${JIRA_DEPLOYMENT:-cloud}
+      JIRA_EMAIL: ${JIRA_EMAIL:-}
+      JIRA_API_TOKEN: ${JIRA_API_TOKEN:-}
+      JIRA_DEFAULT_PROJECT: ${JIRA_DEFAULT_PROJECT:-}
+      JIRA_FOUR_EYES: ${JIRA_FOUR_EYES:-true}
     # Groupe du socket Docker de l'hôte (getent group docker | cut -d: -f3) pour que Trivy
     # puisse scanner les images locales ; sans cela, Trivy scanne les images d'un registre.
     # Linux : GID du groupe docker. Docker Desktop (Windows/macOS) : mettre DOCKER_GID=0 dans .env.

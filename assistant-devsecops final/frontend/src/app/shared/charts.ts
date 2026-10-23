@@ -185,3 +185,29 @@ export const SEVERITY_COLORS: Record<string, string> = {
   LOW: '#8a94a0',
   UNKNOWN: '#c4c9d0',
 };
+
+/** Mini-courbe (tendance des scores de validation d'une application), sans axe. */
+@Component({
+  selector: 'app-sparkline',
+  standalone: true,
+  template: `
+    @if (points()) {
+      <svg class="sparkline" viewBox="0 0 100 28" preserveAspectRatio="none" role="img" [attr.aria-label]="ariaLabel()">
+        <polyline [attr.points]="points()" fill="none" stroke="currentColor" stroke-width="2" vector-effect="non-scaling-stroke" />
+      </svg>
+    } @else {
+      <span class="muted">—</span>
+    }
+  `,
+})
+export class SparklineComponent {
+  readonly values = input<number[]>([]);
+  readonly ariaLabel = input('Tendance');
+
+  readonly points = computed(() => {
+    const v = this.values();
+    if (v.length < 2) return '';
+    const step = 100 / (v.length - 1);
+    return v.map((x, i) => `${(i * step).toFixed(1)},${(26 - (Math.max(0, Math.min(100, x)) / 100) * 24).toFixed(1)}`).join(' ');
+  });
+}

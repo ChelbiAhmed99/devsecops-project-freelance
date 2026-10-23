@@ -147,6 +147,45 @@ public class AiClient {
         }
     }
 
+    /**
+     * Avis consultatif sur la validation d'une application (POST /validate/assess). Le service IA
+     * reçoit les preuves structurées et la décision déterministe ; il renvoie un avis borné
+     * (opinion, confiance, ajustement, risques, recommandations, références citées).
+     */
+    public Optional<JsonNode> assessValidation(Map<String, Object> payload) {
+        try {
+            HttpResponse<String> response = post("/validate/assess", payload, timeoutSeconds);
+            if (response.statusCode() != 200) {
+                log.warn("Évaluation IA de la validation : réponse {}{}", response.statusCode(), detail(response.body()));
+                return Optional.empty();
+            }
+            return Optional.of(objectMapper.readTree(response.body()));
+        } catch (Exception e) {
+            log.warn("Évaluation IA de la validation indisponible : {}", e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Similarité TF-IDF + cosinus entre un texte et des candidats (POST /ml/similar), utilisée pour
+     * retrouver les tickets Jira correspondant à une anomalie. Vide si le service est indisponible.
+     */
+    public Optional<List<Double>> similarity(String query, List<String> candidates) {
+        if (candidates.isEmpty()) return Optional.of(List.of());
+        try {
+            HttpResponse<String> response = post("/ml/similar", Map.of("query", query, "candidates", candidates), 15);
+            if (response.statusCode() != 200) return Optional.empty();
+            JsonNode scores = objectMapper.readTree(response.body()).path("scores");
+            if (!scores.isArray() || scores.size() != candidates.size()) return Optional.empty();
+            List<Double> result = new ArrayList<>();
+            for (JsonNode n : scores) result.add(n.asDouble(0));
+            return Optional.of(result);
+        } catch (Exception e) {
+            log.debug("Similarité IA indisponible : {}", e.getMessage());
+            return Optional.empty();
+        }
+    }
+
     /** État du service IA pour le tableau de bord : UP/DOWN + fournisseur LLM actif. */
     public Map<String, Object> health() {
         try {

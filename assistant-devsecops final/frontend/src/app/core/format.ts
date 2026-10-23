@@ -31,6 +31,69 @@ export const STATUS_LABELS: Record<string, string> = {
   PASSED: 'Réussi',
   ERROR: 'Erreur',
   SKIPPED: 'Ignoré',
+  // Validation multi-applications
+  VALIDATED: 'Validée',
+  VALIDATED_WITH_RESERVES: 'Validée avec réserves',
+  INCONCLUSIVE: 'Non concluante',
+  PENDING: 'En attente',
+  DONE: 'Terminée',
+  COMPLETED: 'Terminée',
+  PARTIAL: 'Partielle',
+  CONFIRMED: 'Confirmée',
+  OVERRIDDEN: 'Corrigée',
+  // Actions Jira
+  PROPOSED: 'À approuver',
+  EXECUTED: 'Exécutée',
+  SIMULATED: 'Simulée',
+};
+
+/** Statut de validation d'une application : libellé court + classe de couleur. */
+export const VERDICT_LABELS: Record<string, string> = {
+  VALIDATED: 'Validée',
+  VALIDATED_WITH_RESERVES: 'Avec réserves',
+  REJECTED: 'Rejetée',
+  INCONCLUSIVE: 'Non concluante',
+};
+
+export function verdictClass(verdict: string | null | undefined): string {
+  switch (verdict) {
+    case 'VALIDATED':
+      return 'ok';
+    case 'VALIDATED_WITH_RESERVES':
+      return 'high';
+    case 'REJECTED':
+      return 'critical';
+    default:
+      return 'low';
+  }
+}
+
+export const LAYER_LABELS: Record<string, string> = {
+  APPLICATION: 'Applicatif',
+  SERVER: 'Serveur JBoss/WildFly',
+  CICD: 'Pipeline CI/CD',
+};
+
+export const CRITICALITY_LABELS: Record<string, string> = {
+  LOW: 'Faible',
+  MEDIUM: 'Moyenne',
+  HIGH: 'Haute',
+  CRITICAL: 'Critique',
+};
+
+export const FIX_STATUS_LABELS: Record<string, string> = {
+  NONE: 'Non appliquée',
+  APPLIED: 'Appliquée — en attente de vérification',
+  VERIFIED: 'Vérifiée : problème résolu',
+  STILL_PRESENT: 'Inefficace : problème toujours présent',
+  NOT_ENOUGH_DATA: 'En attente de nouvelles données',
+};
+
+export const CRITERION_STATUS_LABELS: Record<string, string> = {
+  PASS: 'Conforme',
+  WARN: 'Sous le seuil',
+  FAIL: 'Échec',
+  NO_DATA: 'Sans données',
 };
 
 export const ROLE_LABELS: Record<string, string> = {
@@ -47,6 +110,8 @@ export const CATEGORY_LABELS: Record<string, string> = {
   CODE_DEFECT: 'Défaut de code',
   CONFIGURATION: 'Configuration',
   PERFORMANCE: 'Performance',
+  DEPLOYMENT: 'Déploiement',
+  BUILD: 'Build / CI',
   OTHER: 'Autre',
 };
 

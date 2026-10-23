@@ -5,6 +5,8 @@
 
 package com.vermeg.assistant.model;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -77,7 +79,10 @@ public final class ApiDtos {
     // ---------- IA ----------
     public record ExplainRequest(String incidentType, String source, String message,
                                  Integer occurrences, String extraContext, String incidentRef,
-                                 Boolean force) { }
+                                 Boolean force, String application) { }
+
+    /** Déclaration humaine qu'une correction validée a été appliquée (référence : commit, MR, ticket...). */
+    public record AppliedRequest(String reference, String comment) { }
 
     public record ReviewRequest(String status, String comment) { }
 
@@ -87,6 +92,52 @@ public final class ApiDtos {
 
     public record ChatResponse(String answer, String provider, String model,
                                LocalDateTime answeredAt) { }
+
+    // ---------- Applications (multi-applications) ----------
+    public record ApplicationView(Long id, String code, String name, String description, String owner,
+                                  String criticality, String serverType, String projectPath, String reportsPath,
+                                  String coveragePath, String logSources, String jiraProjectKey, String repositoryUrl,
+                                  String policyOverrides, boolean active, boolean defaultApplication,
+                                  LocalDateTime createdAt, LocalDateTime updatedAt) { }
+
+    public record ApplicationUpsertRequest(String code, String name, String description, String owner,
+                                           String criticality, String serverType, String projectPath,
+                                           String reportsPath, String coveragePath, String logSources,
+                                           String jiraProjectKey, String repositoryUrl, String policyOverrides,
+                                           Boolean active) { }
+
+    // ---------- Validation multi-applications ----------
+    /** mode : LATEST_RESULTS (dernières preuves) ou RUN_TESTS (exécute les tests de chaque application avant). */
+    public record ValidationRequest(List<String> applications, String mode, Boolean useLlm, String label) { }
+
+    /** decision : CONFIRM (valider la décision automatique) ou OVERRIDE (la corriger, commentaire obligatoire). */
+    public record ValidationDecisionRequest(String decision, String verdict, String comment) { }
+
+    public record ApplicationValidationSummary(Long id, Long campaignId, String applicationCode, String applicationName,
+                                               String criticality, String state, String verdict, String finalVerdict,
+                                               Double score, Double baseScore, Double llmAdjustment, Double confidence,
+                                               boolean reviewRequired, Integer testsTotal, Integer testsFailed,
+                                               Double successRate, Double lineCoverage, Long openCritical, Long openHigh,
+                                               Integer criticalAnomalies, Integer incidents, Long logErrors,
+                                               String llmStatus, String llmOpinion, String llmProvider, String error,
+                                               LocalDateTime startedAt, LocalDateTime finishedAt, String humanDecision,
+                                               String decidedBy, LocalDateTime decidedAt, String decisionComment) { }
+
+    public record ValidationCampaignView(Long id, String label, String mode, boolean useLlm, String status,
+                                         List<String> applications, String triggeredBy, LocalDateTime startedAt,
+                                         LocalDateTime finishedAt, int total, int validated, int reserves, int rejected,
+                                         int inconclusive, int errors, Double averageScore, String jobId,
+                                         List<ApplicationValidationSummary> results) { }
+
+    public record ApplicationValidationDetail(ApplicationValidationSummary summary,
+                                              JsonNode report) { }
+
+    public record PortfolioEntry(ApplicationView application, ApplicationValidationSummary lastValidation,
+                                 List<Double> scoreTrend) { }
+
+    public record PortfolioSummary(int applications, int validated, int reserves, int rejected, int inconclusive,
+                                   int neverValidated, int pendingReviews, Double averageScore,
+                                   List<PortfolioEntry> entries, LocalDateTime generatedAt) { }
 
     // ---------- Audit ----------
     public record AuditView(Long id, LocalDateTime at, String username, String action,

@@ -1,0 +1,124 @@
+<div class="page-header">
+  <div>
+    <p class="eyebrow">Portefeuille</p>
+    <h1>Applications</h1>
+    <p class="page-header__lead">Chaque application a ses propres résultats de tests, logs (applicatifs, serveur, CI), vulnérabilités,
+      validations et rapports. Les données publiées sans code d'application sont rattachées à l'application par défaut.</p>
+  </div>
+  <div class="actions">
+    <label class="checkbox"><input type="checkbox" [checked]="showInactive()" (change)="showInactive.set(!showInactive())" /> Afficher les désactivées</label>
+    <button class="btn" type="button" (click)="load()">Actualiser</button>
+    @if (auth.canManageSecurity()) {
+      <button class="btn btn--primary" type="button" (click)="create()">Nouvelle application</button>
+    }
+  </div>
+</div>
+
+<details class="help">
+  <summary>Comment rattacher les données à une application ?</summary>
+  <div class="help__body">
+    <p><strong>Pipeline CI/CD</strong> : ajoutez le paramètre <code>app=&lt;code&gt;</code> aux appels
+      <code>/api/ci/tests</code>, <code>/api/ci/logs</code>, <code>/api/ci/security/…</code> et <code>/api/ci/quality-gate</code>.
+      Pour les logs, <code>logType=SERVER</code> (JBoss/WildFly) ou <code>logType=CICD</code> précise la couche ; sinon elle est déduite.</p>
+    <p><strong>Sources de logs</strong> : les logs dont la source figure dans la liste déclarée sont automatiquement rattachés à l'application.</p>
+    <p><strong>Criticité</strong> : elle adapte la politique de validation (seuils plus stricts et revue humaine systématique pour une application critique).
+      Les <strong>surcharges</strong> (JSON) permettent d'ajuster finement la politique, par exemple
+      <code>{{ '{' }}"minCoverage": 70, "weights": {{ '{' }}"SECURITY": 40{{ '}' }}{{ '}' }}</code>.</p>
+  </div>
+</details>
+
+@if (loading()) { <div class="loading"><span class="spinner"></span> Chargement…</div> }
+
+<section class="app-grid">
+  @for (a of visible(); track a.code) {
+    @let v = lastValidation()[a.code];
+    <article class="panel app-card panel--{{ v ? (v.finalVerdict | verdictClass) : 'low' }}" [class.app-card--inactive]="!a.active">
+      <header class="app-card__header">
+        <div>
+          <h2>{{ a.name }}</h2>
+          <p class="muted"><code>{{ a.code }}</code>@if (a.defaultApplication) { · application par défaut }@if (!a.active) { · désactivée }</p>
+        </div>
+        <app-score-ring [score]="v?.score ?? null" [verdict]="v?.finalVerdict ?? null" [size]="56" />
+      </header>
+      <p class="app-card__meta">
+        <span class="badge crit crit--{{ a.criticality }}">Criticité {{ a.criticality | lbl: 'criticality' }}</span>
+        @if (a.serverType) { <span class="badge badge--outline">{{ a.serverType }}</span> }
+        @if (a.jiraProjectKey) { <span class="badge badge--outline">Jira {{ a.jiraProjectKey }}</span> }
+      </p>
+      @if (a.description) { <p class="muted">{{ a.description }}</p> }
+      <dl class="props">
+        <dt>Responsable</dt><dd>{{ a.owner || '—' }}</dd>
+        <dt>Sources de logs</dt><dd>@for (s of sources(a); track s) { <code>{{ s }}</code>&nbsp; } @empty { — }</dd>
+        <dt>Dernière validation</dt>
+        <dd>
+          @if (v) {
+            <a [routerLink]="['/validation/report', v.id]">{{ v.finalVerdict | lbl: 'verdict' }}</a> · {{ v.finishedAt | relative }}
+            @if (v.reviewRequired && !v.humanDecision) { <span class="badge badge--high">revue requise</span> }
+          } @else { jamais validée }
+        </dd>
+      </dl>
+      @if (gate()?.code === a.code) {
+        <div class="gate gate--{{ gate()?.result?.status === 'PASSED' ? 'ok' : 'ko' }}">
+          Quality gate : <strong>{{ gate()?.result?.status === 'PASSED' ? 'FRANCHI' : 'ÉCHEC' }}</strong>
+          <ul class="gate-list">
+            @for (c of gate()?.result?.conditions ?? []; track c.name) {
+              <li>{{ c.passed ? '✓' : '✗' }} {{ c.name }} : {{ c.actual }} ({{ c.threshold }})</li>
+            }
+          </ul>
+        </div>
+      }
+      <div class="actions">
+        @if (a.active) { <button class="btn btn--sm btn--primary" type="button" (click)="validate(a)">Valider</button> }
+        <button class="btn btn--sm" type="button" (click)="showGate(a)">Quality gate</button>
+        @if (auth.canManageSecurity()) {
+          <button class="btn btn--sm" type="button" (click)="edit(a)">Modifier</button>
+          @if (!a.defaultApplication) {
+            <button class="btn btn--sm btn--ghost" type="button" (click)="toggleActive(a)">{{ a.active ? 'Désactiver' : 'Réactiver' }}</button>
+          }
+        }
+      </div>
+    </article>
+  } @empty {
+    @if (!loading()) { <p class="empty">Aucune application.</p> }
+  }
+</section>
+
+@if (editing(); as e) {
+  <div class="modal-backdrop" (click)="editing.set(null)">
+    <form class="modal" (click)="$event.stopPropagation()" (ngSubmit)="save()">
+      <header class="modal__header">
+        <h2>{{ e.code ? 'Modifier ' + e.form.name : 'Nouvelle application' }}</h2>
+        <button class="icon-btn" type="button" aria-label="Fermer" (click)="editing.set(null)">×</button>
+      </header>
+      <div class="grid grid--2">
+        <label class="field"><span>Code (identifiant stable, utilisé par le pipeline)</span>
+          <input type="text" name="code" [(ngModel)]="e.form.code" [disabled]="!!e.code" required placeholder="portail-paiement" /></label>
+        <label class="field"><span>Nom</span><input type="text" name="name" [(ngModel)]="e.form.name" required /></label>
+        <label class="field"><span>Criticité métier</span>
+          <select name="criticality" [(ngModel)]="e.form.criticality">
+            @for (c of criticalities; track c) { <option [value]="c">{{ c | lbl: 'criticality' }}</option> }
+          </select></label>
+        <label class="field"><span>Serveur d'exécution</span>
+          <select name="serverType" [(ngModel)]="e.form.serverType">
+            <option value="">—</option>
+            @for (t of serverTypes; track t) { <option [value]="t">{{ t }}</option> }
+          </select></label>
+        <label class="field"><span>Responsable</span><input type="text" name="owner" [(ngModel)]="e.form.owner" /></label>
+        <label class="field"><span>Projet Jira (clé)</span><input type="text" name="jira" [(ngModel)]="e.form.jiraProjectKey" placeholder="PAY" /></label>
+        <label class="field"><span>Sources de logs (séparées par des virgules)</span>
+          <input type="text" name="sources" [(ngModel)]="e.form.logSources" placeholder="payment-service,payment-gateway" /></label>
+        <label class="field"><span>Dossier du projet Maven (exécution des tests)</span>
+          <input type="text" name="projectPath" [(ngModel)]="e.form.projectPath" placeholder="/workspace/portail-paiement" /></label>
+        <label class="field"><span>Dépôt Git</span><input type="text" name="repo" [(ngModel)]="e.form.repositoryUrl" /></label>
+      </div>
+      <label class="field"><span>Description</span><input type="text" name="description" [(ngModel)]="e.form.description" /></label>
+      <label class="field"><span>Surcharges de la politique de validation (JSON, optionnel)</span>
+        <textarea name="overrides" rows="4" [(ngModel)]="e.form.policyOverrides"
+                  placeholder='{"minCoverage": 70, "blockOnCoverage": true, "weights": {"SECURITY": 40}}'></textarea></label>
+      <div class="actions">
+        <button class="btn btn--primary" type="submit">Enregistrer</button>
+        <button class="btn" type="button" (click)="editing.set(null)">Annuler</button>
+      </div>
+    </form>
+  </div>
+}

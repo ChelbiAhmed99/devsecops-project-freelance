@@ -1,0 +1,331 @@
+<p class="breadcrumb"><a routerLink="/validation">← Validation des applications</a></p>
+
+@if (error()) {
+  <div class="alert alert--error">{{ error() }}</div>
+}
+
+@if (report(); as r) {
+  @let s = summary()!;
+  <header class="panel report-hero panel--{{ s.finalVerdict | verdictClass }}">
+    <div class="report-hero__main">
+      <p class="eyebrow">Rapport de validation · campagne #{{ r.campaignId }} · {{ r.generatedAt | dt }} · par {{ r.generatedBy }}</p>
+      <h1>{{ r.applicationName }}</h1>
+      <p class="muted"><code>{{ r.applicationCode }}</code> · criticité
+        <span class="crit-text crit-text--{{ r.criticality }}">{{ r.criticality | lbl: 'criticality' }}</span>
+        @if (r.serverType) { · {{ r.serverType }} } @if (r.owner) { · {{ r.owner }} }</p>
+      <div class="actions">
+        <button class="btn" type="button" (click)="print()">Version imprimable / PDF</button>
+        <button class="btn" type="button" (click)="download('html')">HTML</button>
+        <button class="btn" type="button" (click)="download('md')">Markdown</button>
+      </div>
+    </div>
+    <div class="report-hero__verdict">
+      <app-score-ring [score]="r.score" [verdict]="s.finalVerdict" [size]="96" />
+      <span class="badge badge--{{ s.finalVerdict | verdictClass }} badge--lg">{{ s.finalVerdict | lbl: 'verdict' }}</span>
+      @if (s.humanDecision) {
+        <span class="muted">{{ s.humanDecision === 'CONFIRMED' ? 'confirmée' : 'corrigée' }} par {{ s.decidedBy }}</span>
+      } @else {
+        <span class="muted">décision automatique</span>
+      }
+    </div>
+  </header>
+
+  @if (r.blockingReasons.length) {
+    <div class="alert alert--error"><strong>Critère(s) bloquant(s) :</strong>
+      <ul>@for (b of r.blockingReasons; track b) { <li>{{ b }}</li> }</ul></div>
+  }
+  @if (r.reviewRequired && !s.humanDecision) {
+    <div class="alert alert--warn"><strong>Revue humaine obligatoire.</strong> @for (x of r.reviewReasons; track x) { {{ x }} }</div>
+  }
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" type="button" [class.active]="tab() === 'synthese'" (click)="tab.set('synthese')">Décision expliquée</button>
+    <button role="tab" type="button" [class.active]="tab() === 'tests'" (click)="tab.set('tests')">Tests
+      @if (r.tests.failed) { <span class="count">{{ r.tests.failed }}</span> }</button>
+    <button role="tab" type="button" [class.active]="tab() === 'logs'" (click)="tab.set('logs')">Logs et incidents
+      @if (r.incidents.length) { <span class="count">{{ r.incidents.length }}</span> }</button>
+    <button role="tab" type="button" [class.active]="tab() === 'securite'" (click)="tab.set('securite')">Sécurité</button>
+    <button role="tab" type="button" [class.active]="tab() === 'actions'" (click)="tab.set('actions')">Risques et recommandations</button>
+    <button role="tab" type="button" [class.active]="tab() === 'ia'" (click)="tab.set('ia')">Analyse IA</button>
+    <button role="tab" type="button" [class.active]="tab() === 'politique'" (click)="tab.set('politique')">Politique</button>
+  </nav>
+
+  @switch (tab()) {
+    @case ('synthese') {
+      <section class="grid grid--2">
+        <div class="panel">
+          <h2>D'où vient le score ?</h2>
+          <div class="waterfall">
+            <div class="wf-row"><span>Départ</span><span class="wf-bar"><i style="width:100%"></i></span><b>100</b></div>
+            @for (c of waterfall(); track c.code) {
+              <div class="wf-row"><span>− {{ c.label }}</span>
+                <span class="wf-bar"><i class="lost" [style.width.%]="c.pointsLost"></i></span><b>−{{ c.pointsLost }}</b></div>
+            }
+            <div class="wf-row wf-row--total"><span>Score déterministe</span>
+              <span class="wf-bar"><i [style.width.%]="r.baseScore"></i></span><b>{{ r.baseScore }}</b></div>
+            @if (r.llmAdjustment !== 0) {
+              <div class="wf-row"><span>Ajustement IA (borné)</span><span class="wf-bar"></span><b>{{ r.llmAdjustment > 0 ? '+' : '' }}{{ r.llmAdjustment }}</b></div>
+            }
+            <div class="wf-row wf-row--total"><span>Score final</span>
+              <span class="wf-bar"><i [style.width.%]="r.score"></i></span><b>{{ r.score }}</b></div>
+          </div>
+          <p class="muted">Confiance des preuves : <strong>{{ pct(r.confidence) }}</strong>
+            @if (r.previousScore !== null) { · validation précédente : {{ r.previousScore }}/100 ({{ r.previousVerdict }}) }</p>
+        </div>
+        <div class="panel">
+          <h2>Raisonnement de décision</h2>
+          <ol class="trace">
+            @for (t of r.trace; track $index) {
+              <li><strong>{{ t.rule }}</strong> <span class="badge badge--outline">{{ t.outcome }}</span><div class="muted">{{ t.detail }}</div></li>
+            }
+          </ol>
+        </div>
+      </section>
+
+      <section class="panel panel--flush">
+        <table class="table">
+          <thead><tr><th>Critère</th><th>Mesure</th><th>Seuil</th><th>Score</th><th>Poids effectif</th><th>Points perdus</th><th>Statut</th></tr></thead>
+          <tbody>
+            @for (c of r.criteria; track c.code) {
+              <tr>
+                <td><strong>{{ c.label }}</strong><div class="muted">{{ c.justification }}</div>
+                  @if (c.adaptation) { <div class="muted"><em>{{ c.adaptation }}</em></div> }</td>
+                <td class="mono">{{ c.measured }}</td>
+                <td class="mono muted">{{ c.threshold }}</td>
+                <td class="mono">{{ c.status === 'NO_DATA' ? '—' : c.score }}</td>
+                <td class="mono">{{ c.effectiveWeight }}</td>
+                <td class="mono">{{ c.pointsLost }}</td>
+                <td><span class="badge crit-status crit-status--{{ c.status }}">{{ c.status | lbl: 'criterion' }}{{ c.blockingFailed ? ' · bloquant' : '' }}</span></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </section>
+
+      @if (history().length > 1) {
+        <section class="panel">
+          <h2>Évolution du score de l'application</h2>
+          <app-line-chart [series]="trendSeries()" [labels]="trendLabels()" ariaLabel="Évolution du score de validation" />
+        </section>
+      }
+
+      <section class="panel decision-panel">
+        <h2>Décision humaine</h2>
+        @if (s.humanDecision) {
+          <p><span class="badge badge--{{ s.humanDecision === 'CONFIRMED' ? 'ok' : 'high' }}">{{ s.humanDecision | lbl }}</span>
+            <strong>{{ s.finalVerdict | lbl: 'verdict' }}</strong> par {{ s.decidedBy }} {{ s.decidedAt | relative }}</p>
+          @if (s.decisionComment) { <blockquote class="quote">{{ s.decisionComment }}</blockquote> }
+          @if (s.humanDecision === 'OVERRIDDEN') { <p class="muted">Décision automatique initiale : {{ s.verdict | lbl: 'verdict' }} ({{ s.score }}/100).</p> }
+        } @else if (auth.canManageSecurity()) {
+          <p class="muted">Confirmez la décision automatique, ou corrigez-la en la justifiant. L'action est tracée dans le journal d'audit et
+            ajoutée au rapport ; elle sert aussi à calibrer la confiance accordée à l'IA lors des prochaines validations.</p>
+          <label class="field"><span>Commentaire (obligatoire pour une correction)</span>
+            <textarea name="comment" rows="3" [(ngModel)]="decisionComment" placeholder="ex. Dérogation accordée par le comité qualité du 21/10 : correctif planifié en 4.2.1"></textarea></label>
+          <div class="actions">
+            <button class="btn btn--primary" type="button" [disabled]="deciding()" (click)="confirm()">Confirmer « {{ s.verdict | lbl: 'verdict' }} »</button>
+            <select name="override" [(ngModel)]="overrideVerdict" aria-label="Décision corrigée">
+              @for (v of verdicts; track v) { <option [value]="v">{{ v | lbl: 'verdict' }}</option> }
+            </select>
+            <button class="btn" type="button" [disabled]="deciding()" (click)="override()">Corriger la décision</button>
+          </div>
+        } @else {
+          <p class="muted">En attente de validation par un responsable qualité.</p>
+        }
+      </section>
+    }
+
+    @case ('tests') {
+      @if (!r.tests.available) {
+        <p class="empty">Aucun résultat de tests pour cette application : importez des rapports JUnit (paramètre <code>app</code>) ou relancez la validation en mode « exécuter les tests ».</p>
+      } @else {
+        <section class="grid grid--4">
+          <div class="panel stat"><span class="stat__value">{{ r.tests.total }}</span><span class="stat__label">tests</span></div>
+          <div class="panel stat" [class.panel--critical]="r.tests.failed > 0"><span class="stat__value">{{ r.tests.failed }}</span><span class="stat__label">en échec</span></div>
+          <div class="panel stat"><span class="stat__value">{{ r.tests.successRate }} %</span><span class="stat__label">réussite</span></div>
+          <div class="panel stat"><span class="stat__value">{{ r.tests.lineCoverage ?? '—' }}{{ r.tests.lineCoverage !== null ? ' %' : '' }}</span><span class="stat__label">couverture de lignes</span></div>
+        </section>
+        <p class="muted">Exécution #{{ r.tests.runId }} du {{ r.tests.executedAt | dt }} ({{ r.tests.trigger | lbl }}) · {{ r.tests.ageHours }} h avant la validation</p>
+        @if (r.tests.newFailures.length) {
+          <div class="alert alert--warn"><strong>Régression :</strong> ces tests réussissaient à l'exécution précédente :
+            @for (t of r.tests.newFailures; track t) { <code>{{ t }}</code>&nbsp; }</div>
+        }
+        @if (r.tests.fixedTests.length) {
+          <div class="alert alert--info">Corrigés depuis l'exécution précédente : @for (t of r.tests.fixedTests; track t) { <code>{{ t }}</code>&nbsp; }</div>
+        }
+        @for (f of r.tests.failures; track f.ref) {
+          <article class="panel panel--{{ f.newFailure ? 'critical' : 'high' }}">
+            <header class="anomaly__header">
+              <div><span class="badge badge--{{ f.status === 'ERROR' ? 'critical' : 'high' }}">{{ f.status | lbl }}</span>
+                @if (f.newFailure) { <span class="badge badge--critical">nouvel échec</span> }
+                <span class="mono">{{ f.suite }}#{{ f.test }}</span></div>
+              <div class="actions">
+                <button class="btn btn--sm" type="button" (click)="jiraFor('test_failure', f.ref, f.suite + '#' + f.test + ' : ' + (f.message ?? ''))">Jira</button>
+                <button class="btn btn--sm btn--primary" type="button" (click)="explainFailure(f)">Corriger (IA)</button>
+              </div>
+            </header>
+            @if (f.message) { <p class="testcase__msg">{{ f.message }}</p> }
+            @if (f.stackExcerpt) { <pre class="code-block">{{ f.stackExcerpt }}</pre> }
+            @if (f.relatedLogs.length) {
+              <p class="eyebrow">Logs les plus proches</p>
+              <pre class="code-block">{{ lines(f.relatedLogs) }}</pre>
+            }
+          </article>
+        }
+        @if (r.tests.flaky.length) {
+          <section class="panel">
+            <h2>Tests instables</h2>
+            <ul class="bars-list">
+              @for (t of r.tests.flaky; track t.testName) {
+                <li><span class="mono">{{ t.suiteName }}#{{ t.testName }}</span><span class="muted">{{ t.failures }}/{{ t.runsObserved }} échecs · {{ t.flakinessPercent }} %</span></li>
+              }
+            </ul>
+          </section>
+        }
+      }
+    }
+
+    @case ('logs') {
+      @if (!r.logs.available) {
+        <p class="empty">Aucun log rattaché à cette application (paramètre <code>app</code> à l'ingestion, ou sources déclarées dans l'écran Applications).</p>
+      } @else {
+        <section class="grid grid--4">
+          <div class="panel stat"><span class="stat__value">{{ r.logs.total }}</span><span class="stat__label">lignes analysées</span></div>
+          <div class="panel stat"><span class="stat__value">{{ r.logs.errorRatePercent }} %</span><span class="stat__label">taux d'erreur</span></div>
+          <div class="panel stat" [class.panel--critical]="r.logs.criticalAnomalies > 0"><span class="stat__value">{{ r.logs.criticalAnomalies }}</span><span class="stat__label">anomalies critiques</span></div>
+          <div class="panel stat"><span class="stat__value">{{ r.logs.spikes }}</span><span class="stat__label">pics d'erreurs</span></div>
+        </section>
+        <section class="panel">
+          <h2>Par couche</h2>
+          <div class="layers">
+            @for (l of layers(); track l[0]) {
+              <div class="layer-card layer-card--{{ l[0] }}">
+                <span class="eyebrow">{{ l[0] | lbl: 'layer' }}</span>
+                <strong>{{ l[1] }}</strong> ligne(s) · <span [class.text-critical]="errorsFor(l[0]) > 0">{{ errorsFor(l[0]) }} erreur(s)</span>
+              </div>
+            }
+          </div>
+        </section>
+        <h2 class="section-title">Incidents corrélés et cause racine</h2>
+        @for (i of r.incidents; track i.id) {
+          <app-incident-card [incident]="i" (explain)="explainIncident($event)" (jira)="jiraIncident($event)" />
+        } @empty {
+          <p class="empty">Aucun incident corrélé (rafale d'erreurs) détecté.</p>
+        }
+        <h2 class="section-title">Anomalies</h2>
+        @for (a of r.logs.anomalies; track a.key) {
+          <div class="list-item list-item--{{ a.critical ? 'critical' : (a.level | sev) }}">
+            <div class="list-item__main">
+              <span class="mono">{{ a.message }}</span>
+              <span class="muted">{{ a.layer | lbl: 'layer' }} · {{ a.category | lbl: 'category' }}{{ a.errorCode ? ' · ' + a.errorCode : '' }} · {{ a.occurrences }}× · {{ a.sources.join(', ') }}</span>
+            </div>
+            <div class="actions">
+              <button class="btn btn--sm" type="button" (click)="jiraFor('log_anomaly', a.key, a.message)">Jira</button>
+              <button class="btn btn--sm btn--primary" type="button" (click)="explainAnomaly(a)">Corriger (IA)</button>
+            </div>
+          </div>
+        }
+        @if (r.logs.excerpts.length) {
+          <details class="panel"><summary>Extraits de logs (dernières erreurs)</summary>
+            <pre class="code-block">{{ lines(r.logs.excerpts) }}</pre></details>
+        }
+      }
+    }
+
+    @case ('securite') {
+      @if (!r.security.available) {
+        <p class="empty">Aucun résultat de scan de sécurité pour cette application (importez un rapport Dependency-Check ou Trivy avec le paramètre <code>app</code>).</p>
+      } @else {
+        <section class="grid grid--4">
+          @for (sev of ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']; track sev) {
+            <div class="panel stat panel--{{ sev | sev }}"><span class="stat__value">{{ r.security.openBySeverity[sev] ?? 0 }}</span><span class="stat__label">{{ sev }}</span></div>
+          }
+        </section>
+        <section class="panel panel--flush">
+          <table class="table">
+            <thead><tr><th>Priorité</th><th>ID</th><th>Sévérité</th><th>Composant</th><th>Correctif</th><th></th></tr></thead>
+            <tbody>
+              @for (v of r.security.top; track v.recordId) {
+                <tr>
+                  <td><span class="priority priority--{{ v.severity | sev }}">{{ v.priorityScore }}</span></td>
+                  <td class="mono">{{ v.id }}</td>
+                  <td><span class="badge badge--{{ v.severity | sev }}">{{ v.severity }}</span></td>
+                  <td class="truncate" [title]="v.affectedComponent">{{ v.affectedComponent }}</td>
+                  <td>{{ v.fixedVersion ?? '—' }}</td>
+                  <td class="actions">
+                    <button class="btn btn--sm" type="button" (click)="jiraFor('vulnerability', 'vuln:' + v.source + ':' + v.id + ':' + v.affectedComponent, v.id + ' ' + v.affectedComponent)">Jira</button>
+                    <button class="btn btn--sm btn--primary" type="button" (click)="explainVulnerability(v)">Corriger (IA)</button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </section>
+      }
+    }
+
+    @case ('actions') {
+      <section class="grid grid--2">
+        <div class="panel">
+          <h2>Risques</h2>
+          @for (k of r.risks; track $index) {
+            <div class="list-item list-item--{{ k.level | sev }}">
+              <div class="list-item__main"><span><strong>{{ k.title }}</strong> <span class="badge badge--{{ k.level | sev }}">{{ k.level }}</span></span>
+                <span class="muted">{{ k.detail }} · {{ k.source }}</span></div>
+            </div>
+          } @empty { <p class="empty">Aucun risque significatif.</p> }
+        </div>
+        <div class="panel">
+          <h2>Recommandations priorisées</h2>
+          <ol class="recs">
+            @for (k of r.recommendations; track k.priority) {
+              <li><strong>{{ k.action }}</strong> <span class="badge badge--outline">{{ k.source }}</span><div class="muted">{{ k.rationale }}</div></li>
+            } @empty { <p class="empty">Aucune action requise.</p> }
+          </ol>
+        </div>
+      </section>
+    }
+
+    @case ('ia') {
+      <section class="panel">
+        <h2>Avis de l'IA (consultatif)</h2>
+        @if (r.llm; as llm) {
+          @if (llm.status === 'USED' || llm.status === 'IGNORED') {
+            <p><span class="badge badge--{{ llm.status === 'USED' ? 'ok' : 'high' }}">{{ llm.status === 'USED' ? 'Pris en compte (borné)' : 'Ignoré' }}</span>
+              Avis <strong>{{ llm.opinion }}</strong> · confiance {{ pct(llm.confidence) }} · {{ llm.provider }} {{ llm.model }}</p>
+            <p>Ajustement proposé {{ llm.proposedAdjustment }}, appliqué <strong>{{ llm.appliedAdjustment }}</strong> (borne ± {{ llm.allowedAdjustment }}).</p>
+            @if (llm.note) { <p class="muted">{{ llm.note }}</p> }
+            @if (llm.justification) { <blockquote class="quote">{{ llm.justification }}</blockquote> }
+            @if (llm.ungroundedRefs.length) {
+              <div class="alert alert--warn">Références absentes des preuves (avis ignoré) : @for (x of llm.ungroundedRefs; track x) { <code>{{ x }}</code>&nbsp; }</div>
+            }
+            @if (llm.citedRefs.length) { <p class="muted">Références citées : @for (x of llm.citedRefs; track x) { <code>{{ x }}</code>&nbsp; }</p> }
+          } @else {
+            <p class="muted">{{ llm.note ?? 'Avis IA indisponible.' }} La décision est purement déterministe.</p>
+          }
+        }
+        <p class="disclaimer">Le modèle de langage ne décide jamais seul : son avis ne peut ajuster le score que dans une marge bornée
+          (réduite si l'IA a souvent été contredite par les humains), il ne lève aucune règle bloquante, ses références sont vérifiées
+          et tout désaccord impose une revue humaine.</p>
+      </section>
+    }
+
+    @case ('politique') {
+      <section class="panel panel--flush">
+        <table class="table">
+          <tbody>
+            @for (e of policyEntries(); track e[0]) { <tr><th>{{ e[0] }}</th><td>{{ e[1] }}</td></tr> }
+          </tbody>
+        </table>
+      </section>
+    }
+  }
+} @else if (!error()) {
+  <div class="loading"><span class="spinner"></span> Chargement du rapport…</div>
+}
+
+@if (explain(); as req) {
+  <app-explain-dialog [request]="req" (closed)="explain.set(null)" />
+}
+@if (jira(); as q) {
+  <app-jira-dialog [query]="q" (closed)="jira.set(null)" />
+}

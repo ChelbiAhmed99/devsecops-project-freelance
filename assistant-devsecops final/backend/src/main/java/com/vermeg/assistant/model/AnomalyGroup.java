@@ -28,6 +28,12 @@ public class AnomalyGroup {
     private String category;
     private LocalDateTime firstSeen;
     private LocalDateTime lastSeen;
+    /** Couche dominante : APPLICATION, SERVER (JBoss/WildFly) ou CICD. */
+    private String logType;
+    /** Toutes les couches où l'erreur apparaît. */
+    private Set<String> layers;
+    /** Code d'erreur reconnu (WFLYCTL0013, IJ000453, ORA-00942...). */
+    private String errorCode;
 
     public AnomalyGroup() {
     }
@@ -66,4 +72,10 @@ public class AnomalyGroup {
     public void setFirstSeen(LocalDateTime firstSeen) { this.firstSeen = firstSeen; }
     public LocalDateTime getLastSeen() { return lastSeen; }
     public void setLastSeen(LocalDateTime lastSeen) { this.lastSeen = lastSeen; }
+    public String getLogType() { return logType; }
+    public void setLogType(String logType) { this.logType = logType; }
+    public Set<String> getLayers() { return layers; }
+    public void setLayers(Set<String> layers) { this.layers = layers; }
+    public String getErrorCode() { return errorCode; }
+    public void setErrorCode(String errorCode) { this.errorCode = errorCode; }
 }

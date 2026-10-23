@@ -5,8 +5,10 @@
 
 package com.vermeg.assistant.service;
 
+import com.vermeg.assistant.domain.ManagedApplication;
 import com.vermeg.assistant.domain.TestRunRecord;
 import com.vermeg.assistant.model.CorrelatedFailure;
+import com.vermeg.assistant.model.LogEntry;
 import com.vermeg.assistant.model.SuiteResult;
 import com.vermeg.assistant.model.TestExecutionSummary;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,6 +16,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
+import java.nio.file.Path;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -83,6 +87,29 @@ public class TestOrchestrationService {
         });
     }
 
+    /**
+     * Exécution synchrone des tests d'une application (appelée depuis une campagne de validation,
+     * elle-même déjà asynchrone). Renvoie le résumé enregistré, ou vide si aucun rapport n'a été produit.
+     */
+    public Optional<TestExecutionSummary> runForApplication(ManagedApplication app) {
+        String project = app.getProjectPath();
+        if (project == null || project.isBlank()) return Optional.empty();
+        String reports = app.getReportsPath() != null ? app.getReportsPath()
+                : Path.of(project).resolve("target/surefire-reports").toString();
+        String coverage = app.getCoveragePath() != null ? app.getCoveragePath()
+                : Path.of(project).resolve("target/site/jacoco/jacoco.xml").toString();
+        long startedAt = System.currentTimeMillis() - 2000;
+        LocalDateTime windowStart = LocalDateTime.now();
+        TestExecutionService.ExecutionResult result = executionService.runTests(project);
+        List<SuiteResult> suites = surefireParser.parseReportsDirectory(reports, startedAt);
+        if (suites.isEmpty()) return Optional.empty();
+        TestExecutionSummary summary = history.record(suites, jacocoParser.parseFile(coverage).orElse(null),
+                new TestRunHistoryService.RunMetadata("VALIDATION", null, null, null, windowStart, LocalDateTime.now(),
+                        result.exitCode(), ProcessRunner.tail(result.output(), 3500), app.getCode()));
+        auditService.record("TESTS_RUN", app.getCode(), "campagne de validation : " + summary.getTotalTests() + " tests");
+        return Optional.of(summary);
+    }
+
     /** Import de rapports JUnit XML (+ JaCoCo optionnel) envoyés par le pipeline ou l'interface. */
     public TestExecutionSummary importReports(List<MultipartFile> reports, MultipartFile coverage,
                                               TestRunHistoryService.RunMetadata meta) throws Exception {
@@ -102,7 +129,8 @@ public class TestOrchestrationService {
             }
         }
         TestExecutionSummary summary = history.record(suites, cov, meta);
-        auditService.record("TESTS_IMPORT", meta.trigger(), suites.size() + " suites importées");
+        auditService.record("TESTS_IMPORT", meta.trigger() + (meta.application() == null ? "" : " " + meta.application()),
+                suites.size() + " suites importées");
         return summary;
     }
 
@@ -119,6 +147,27 @@ public class TestOrchestrationService {
         });
         fromDisk.setTrigger("DISK");
         return fromDisk;
+    }
+
+    /** Dernière exécution d'une application (null ou vide = toutes applications confondues). */
+    public TestExecutionSummary currentResults(String application) {
+        if (application == null || application.isBlank()) return currentResults();
+        return history.latest(application).orElseGet(() -> {
+            TestExecutionSummary empty = TestExecutionSummary.fromSuites(List.of());
+            empty.setApplication(application);
+            return empty;
+        });
+    }
+
+    /** Corrélation échecs/logs pour la dernière exécution d'une application, sur les logs de cette application. */
+    public List<CorrelatedFailure> correlatedFailures(String application, List<LogEntry> applicationLogs) {
+        Optional<TestRunRecord> latest = history.latestRecord(application);
+        if (latest.isEmpty()) return List.of();
+        List<SuiteResult> suites = history.readSuites(latest.get().getSuitesJson());
+        Optional<TestExecutionService.TestRunWindow> window = latest.get().getWindowStart() != null && latest.get().getWindowEnd() != null
+                ? Optional.of(new TestExecutionService.TestRunWindow(latest.get().getWindowStart(), latest.get().getWindowEnd()))
+                : Optional.empty();
+        return correlationService.correlate(suites, applicationLogs, window);
     }
 
     public List<CorrelatedFailure> correlatedFailures() {

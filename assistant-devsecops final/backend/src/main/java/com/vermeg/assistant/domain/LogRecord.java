@@ -23,7 +23,8 @@ import java.time.LocalDateTime;
 @Table(name = "log_record", indexes = {
         @Index(name = "idx_log_ts", columnList = "log_timestamp"),
         @Index(name = "idx_log_level", columnList = "log_level"),
-        @Index(name = "idx_log_source", columnList = "source")
+        @Index(name = "idx_log_source", columnList = "source"),
+        @Index(name = "idx_log_app", columnList = "application_code")
 })
 public class LogRecord {
 
@@ -52,6 +53,14 @@ public class LogRecord {
 
     private LocalDateTime ingestedAt;
 
+    /** Application d'origine (multi-applications). */
+    @Column(name = "application_code", length = 60)
+    private String applicationCode;
+
+    /** Couche : APPLICATION, SERVER (JBoss/WildFly...) ou CICD (pipeline). */
+    @Column(name = "log_type", length = 20)
+    private String logType;
+
     public LogRecord() {
     }
 
@@ -64,11 +73,16 @@ public class LogRecord {
         r.message = truncate(entry.getMessage() == null ? "" : entry.getMessage(), MAX_MESSAGE);
         r.stackTrace = truncate(entry.getStackTrace(), MAX_STACK);
         r.ingestedAt = LocalDateTime.now();
+        r.applicationCode = entry.getApplication();
+        r.logType = entry.getLogType();
         return r;
     }
 
     public LogEntry toEntry() {
-        return new LogEntry(id, timestamp, level, source, message, stackTrace);
+        LogEntry e = new LogEntry(id, timestamp, level, source, message, stackTrace);
+        e.setApplication(applicationCode);
+        e.setLogType(logType);
+        return e;
     }
 
     private static String truncate(String value, int max) {
@@ -83,4 +97,6 @@ public class LogRecord {
     public String getMessage() { return message; }
     public String getStackTrace() { return stackTrace; }
     public LocalDateTime getIngestedAt() { return ingestedAt; }
+    public String getApplicationCode() { return applicationCode; }
+    public String getLogType() { return logType; }
 }

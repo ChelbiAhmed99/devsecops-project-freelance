@@ -122,6 +122,79 @@ assistant:
     service-url: ${AI_SERVICE_URL:http://localhost:8000}
     timeout-seconds: 60
 
+  # ---------- Multi-applications ----------
+  applications:
+    # Application qui reçoit les données publiées sans code d'application (compatibilité mono-projet).
+    default-code: ${DEFAULT_APPLICATION_CODE:assistant-devsecops}
+    default-name: ${DEFAULT_APPLICATION_NAME:Assistant DevSecOps (auto-analyse)}
+    # true : un code inconnu reçu du pipeline (paramètre app) crée l'application (action auditée).
+    auto-register: ${CI_AUTO_REGISTER_APPLICATIONS:true}
+
+  # ---------- Corrélation multi-couches (logs applicatifs / serveur / CI) ----------
+  correlation:
+    gap-minutes: 5      # silence qui clôt un incident
+    min-events: 2       # événements minimum (sauf FATAL)
+    max-incidents: 20
+
+  # ---------- Validation hybride et adaptative ----------
+  # Politique de référence (criticité MOYENNE). Elle est automatiquement durcie pour les
+  # applications HAUTES/CRITIQUES, et chaque application peut la surcharger (écran Applications).
+  validation:
+    weights:
+      test-success: 30
+      coverage: 15
+      test-stability: 10
+      security: 25
+      log-health: 15
+      regression: 5
+    min-success-rate: 95
+    blocking-success-rate: 80
+    min-line-coverage: 50
+    max-flaky-percent: 5
+    max-critical-vulnerabilities: 0
+    max-high-vulnerabilities: 3
+    max-critical-anomalies: 3
+    max-error-rate-percent: 5
+    max-test-age-hours: 168
+    block-on-critical-vulnerabilities: true
+    block-on-low-success-rate: true
+    block-on-coverage: false
+    validate-score: 80
+    reserves-score: 60
+    min-confidence: 0.5
+    always-review-critical: true
+    llm:
+      enabled: true
+      # L'avis du LLM ne peut déplacer le score que de ± max-adjustment points (jamais lever une règle bloquante).
+      max-adjustment: 5
+      # Au-delà de cette confiance, un désaccord de l'IA impose une revue humaine.
+      review-confidence: 0.6
+    regression:
+      window: 5
+      tolerance: 10
+
+  # ---------- Corrections assistées par IA ----------
+  corrections:
+    # Vérification automatique des corrections déclarées appliquées (aucune modification de code).
+    verify-interval-ms: 600000
+
+  # ---------- Intégration Jira (optionnelle) ----------
+  # Sans URL ni jeton, l'intégration fonctionne en mode simulation : propositions, validation et
+  # traçabilité restent utilisables, mais aucun appel n'est fait à Jira.
+  jira:
+    enabled: ${JIRA_ENABLED:false}
+    base-url: ${JIRA_BASE_URL:}
+    # cloud (API /rest/api/3/search/jql + e-mail/jeton) ou datacenter (/rest/api/2/search + jeton personnel)
+    deployment: ${JIRA_DEPLOYMENT:cloud}
+    email: ${JIRA_EMAIL:}
+    # Ne jamais committer de vraie valeur : variable JIRA_API_TOKEN.
+    api-token: ${JIRA_API_TOKEN:}
+    default-project: ${JIRA_DEFAULT_PROJECT:}
+    issue-type: ${JIRA_ISSUE_TYPE:Bug}
+    # Principe des quatre yeux : la personne qui propose une action ne peut pas l'approuver.
+    four-eyes: ${JIRA_FOUR_EYES:true}
+    timeout-seconds: 15
+
 logging:
   level:
     com.vermeg.assistant: INFO

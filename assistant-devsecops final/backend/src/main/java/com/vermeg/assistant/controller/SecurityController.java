@@ -7,6 +7,7 @@ package com.vermeg.assistant.controller;
 
 import com.vermeg.assistant.model.ApiDtos;
 import com.vermeg.assistant.model.Vulnerability;
+import com.vermeg.assistant.service.ApplicationService;
 import com.vermeg.assistant.service.JobService;
 import com.vermeg.assistant.service.SecurityScanService;
 import com.vermeg.assistant.service.VulnerabilityService;
@@ -48,18 +49,22 @@ public class SecurityController {
 
     private final VulnerabilityService vulnerabilityService;
     private final SecurityScanService scanService;
+    private final ApplicationService applicationService;
 
-    public SecurityController(VulnerabilityService vulnerabilityService, SecurityScanService scanService) {
+    public SecurityController(VulnerabilityService vulnerabilityService, SecurityScanService scanService,
+                              ApplicationService applicationService) {
         this.vulnerabilityService = vulnerabilityService;
         this.scanService = scanService;
+        this.applicationService = applicationService;
     }
 
     @GetMapping("/vulnerabilities")
     public List<Vulnerability> list(@RequestParam(required = false) String status,
                                     @RequestParam(required = false) String severity,
                                     @RequestParam(required = false) String source,
-                                    @RequestParam(required = false) String q) {
-        return vulnerabilityService.list(status, severity, source, q);
+                                    @RequestParam(required = false) String q,
+                                    @RequestParam(required = false) String app) {
+        return vulnerabilityService.list(status, severity, source, q, app);
     }
 
     @GetMapping("/vulnerabilities/{recordId}")
@@ -82,8 +87,8 @@ public class SecurityController {
     }
 
     @GetMapping("/stats")
-    public ApiDtos.VulnerabilityStats stats() {
-        return vulnerabilityService.stats();
+    public ApiDtos.VulnerabilityStats stats(@RequestParam(required = false) String app) {
+        return vulnerabilityService.stats(app);
     }
 
     @PostMapping("/scan/dependencies")
@@ -106,8 +111,9 @@ public class SecurityController {
 
     @PostMapping(value = "/import/{type}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize(MANAGERS)
-    public ApiDtos.ScanDiff importReport(@PathVariable String type, @RequestPart("file") MultipartFile file)
-            throws Exception {
-        return vulnerabilityService.importReport(type, new String(file.getBytes(), StandardCharsets.UTF_8));
+    public ApiDtos.ScanDiff importReport(@PathVariable String type, @RequestPart("file") MultipartFile file,
+                                         @RequestParam(required = false) String app) throws Exception {
+        return vulnerabilityService.importReport(app == null || app.isBlank() ? null : applicationService.resolve(app, null), type,
+                new String(file.getBytes(), StandardCharsets.UTF_8));
     }
 }

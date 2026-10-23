@@ -1,0 +1,27 @@
+2026-09-18 10:20:02,114 INFO  [org.jboss.as] (MSC service thread 1-2) WFLYSRV0049: WildFly Full 31.0.1.Final (WildFly Core 23.0.3.Final) starting
+2026-09-18 10:20:09,871 INFO  [org.jboss.as.connector.subsystems.datasources] (MSC service thread 1-6) WFLYJCA0001: Bound data source [java:jboss/datasources/TitresDS]
+2026-09-18 10:20:12,402 INFO  [org.wildfly.extension.undertow] (ServerService Thread Pool -- 77) WFLYUT0021: Registered web context: '/back-office-titres' for server 'default-server'
+2026-09-18 10:20:12,980 INFO  [org.jboss.as.server] (ServerService Thread Pool -- 45) WFLYSRV0010: Deployed "back-office-titres.war" (runtime-name : "back-office-titres.war")
+2026-09-18 10:20:13,010 INFO  [org.jboss.as] (Controller Boot Thread) WFLYSRV0025: WildFly Full 31.0.1.Final started in 11024ms
+2026-09-18 10:41:55,207 WARN  [org.jboss.jca.core.connectionmanager.pool.strategy.OnePool] (default task-12) IJ000604: Throwable while attempting to get a new connection: null
+2026-09-18 10:41:55,211 ERROR [org.jboss.jca.core.connectionmanager.listener.TxConnectionListener] (default task-12) IJ000453: Unable to get managed connection for java:jboss/datasources/TitresDS
+Caused by: javax.resource.ResourceException: IJ031084: Unable to create connection
+Caused by: org.postgresql.util.PSQLException: Connection to titres-db:5432 refused. Check that the hostname and port are correct and that the postmaster is accepting TCP/IP connections.
+Caused by: java.net.ConnectException: Connection refused
+2026-09-18 10:41:55,640 ERROR [org.hibernate.engine.jdbc.spi.SqlExceptionHelper] (default task-12) Unable to acquire JDBC Connection
+2026-09-18 10:41:55,702 ERROR [com.vermeg.titres.service.OrdreService] (default task-12) Impossible d'enregistrer l'ordre ORD-88412 : could not open JPA EntityManager for transaction
+2026-09-18 10:41:55,705 ERROR [io.undertow.request] (default task-12) UT005023: Exception handling request to /back-office-titres/api/ordres
+2026-09-18 10:41:58,311 ERROR [org.jboss.jca.core.connectionmanager.listener.TxConnectionListener] (default task-15) IJ000453: Unable to get managed connection for java:jboss/datasources/TitresDS
+2026-09-18 10:41:58,320 ERROR [org.hibernate.engine.jdbc.spi.SqlExceptionHelper] (default task-15) Unable to acquire JDBC Connection
+2026-09-18 10:41:58,402 ERROR [com.vermeg.titres.service.OrdreService] (default task-15) Impossible d'enregistrer l'ordre ORD-88413 : could not open JPA EntityManager for transaction
+2026-09-18 10:41:58,405 ERROR [io.undertow.request] (default task-15) UT005023: Exception handling request to /back-office-titres/api/ordres
+2026-09-18 10:42:03,917 ERROR [org.jboss.jca.core.connectionmanager.listener.TxConnectionListener] (default task-3) IJ000453: Unable to get managed connection for java:jboss/datasources/TitresDS
+2026-09-18 10:42:03,925 ERROR [org.hibernate.engine.jdbc.spi.SqlExceptionHelper] (default task-3) Unable to acquire JDBC Connection
+2026-09-18 10:42:04,011 ERROR [com.vermeg.titres.service.PositionService] (default task-3) Calcul des positions impossible : could not open JPA EntityManager for transaction
+2026-09-18 10:42:30,550 WARN  [com.arjuna.ats.arjuna] (Transaction Reaper) ARJUNA012117: TransactionReaper::check timeout for TX 0:ffffc0a80102:-5c1f9a2b:66ead1f0:3c in state  RUN
+2026-09-18 10:42:30,561 WARN  [com.arjuna.ats.arjuna] (Transaction Reaper Worker 0) ARJUNA012121: TransactionReaper::doCancellations worker Thread[Transaction Reaper Worker 0,5,main] successfully canceled TX 0:ffffc0a80102:-5c1f9a2b:66ead1f0:3c
+2026-09-18 10:43:12,004 INFO  [org.jboss.as.connector.subsystems.datasources] (management-handler-thread - 2) WFLYJCA0010: Unbound data source [java:jboss/datasources/TitresDS]
+2026-09-18 10:43:15,876 INFO  [org.jboss.as.connector.subsystems.datasources] (management-handler-thread - 2) WFLYJCA0001: Bound data source [java:jboss/datasources/TitresDS]
+2026-09-18 11:05:40,118 ERROR [org.jboss.as.controller.management-operation] (DeploymentScanner-threads - 2) WFLYCTL0013: Operation ("deploy") failed - address: ([("deployment" => "reporting-batch.war")]) - failure description: {"WFLYCTL0180: Services with missing/unavailable dependencies" => ["jboss.naming.context.java.module.reporting-batch.reporting-batch.env.jdbc.ReportingDS is missing [jboss.naming.context.java.jboss.datasources.ReportingDS]"]}
+2026-09-18 11:05:40,202 ERROR [org.jboss.as.server] (DeploymentScanner-threads - 2) WFLYSRV0021: Deploy of deployment "reporting-batch.war" was rolled back with the following failure message: WFLYCTL0180: Services with missing/unavailable dependencies
+2026-09-18 11:05:41,330 ERROR [io.undertow.request] (default task-21) UT005023: Exception handling request to /reporting-batch/api/exports: 404 not found

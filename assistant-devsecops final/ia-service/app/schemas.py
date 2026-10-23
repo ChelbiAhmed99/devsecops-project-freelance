@@ -1,5 +1,5 @@
 """Rôle : définir les contrats JSON validés par Pydantic entre le backend et le service IA."""
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -61,3 +61,40 @@ class Outlier(BaseModel):
 class OutlierResponse(BaseModel):
     outliers: list[Outlier]
     model: str = "IsolationForest"
+
+
+# ---------- Validation hybride d'une application ----------
+class ValidationAssessmentRequest(BaseModel):
+    """Preuves structurées d'une application + décision déterministe calculée par le backend."""
+    application: dict[str, Any] = Field(default_factory=dict)
+    deterministic: dict[str, Any] = Field(default_factory=dict)
+    criteria: list[dict[str, Any]] = Field(default_factory=list, max_length=20)
+    tests: dict[str, Any] = Field(default_factory=dict)
+    incidents: list[dict[str, Any]] = Field(default_factory=list, max_length=20)
+    anomalies: list[dict[str, Any]] = Field(default_factory=list, max_length=30)
+    vulnerabilities: list[dict[str, Any]] = Field(default_factory=list, max_length=30)
+    allowed_refs: list[str] = Field(default_factory=list, max_length=500)
+
+
+class ValidationAssessment(BaseModel):
+    """Avis CONSULTATIF : le backend le borne, vérifie son ancrage et garde la décision finale."""
+    opinion: Literal["VALIDATE", "RESERVES", "REJECT"]
+    confidence: float = Field(..., ge=0, le=1)
+    adjustment: float = Field(0, ge=-20, le=20)
+    justification: str
+    risks: list[str] = []
+    recommendations: list[str] = []
+    cited_refs: list[str] = []
+    provider: str
+    model: str
+
+
+# ---------- Similarité (rapprochement anomalie <-> tickets Jira) ----------
+class SimilarityRequest(BaseModel):
+    query: str = Field(..., min_length=1, max_length=8000)
+    candidates: list[str] = Field(..., max_length=200)
+
+
+class SimilarityResponse(BaseModel):
+    scores: list[float]
+    method: str = "tfidf-cosine"

@@ -7,6 +7,7 @@ package com.vermeg.assistant.controller;
 
 import com.vermeg.assistant.model.ApiDtos;
 import com.vermeg.assistant.model.TestExecutionSummary;
+import com.vermeg.assistant.service.ApplicationService;
 import com.vermeg.assistant.service.AuditService;
 import com.vermeg.assistant.service.LogIngestionService;
 import com.vermeg.assistant.service.QualityGateService;
@@ -36,6 +37,11 @@ import java.util.List;
  *   <li>POST /api/ci/security/{dependency-check|trivy} -> rapport JSON brut</li>
  *   <li>GET  /api/ci/quality-gate                 -> PASSED / FAILED (HTTP 200 / 412)</li>
  * </ul>
+ * Multi-applications : chaque route accepte le paramètre {@code app} (code de l'application).
+ * Sans ce paramètre, les données sont rattachées à l'application par défaut (comportement historique).
+ * Les logs acceptent aussi {@code logType} = APPLICATION | SERVER | CICD (sinon déduit ligne par ligne).
+ * <ul>
+ * </ul>
  */
 @RestController
 @RequestMapping("/api/ci")
@@ -46,21 +52,26 @@ public class CiController {
     private final VulnerabilityService vulnerabilityService;
     private final QualityGateService qualityGateService;
     private final AuditService auditService;
+    private final ApplicationService applicationService;
 
     public CiController(LogIngestionService logIngestionService, TestOrchestrationService testService,
                         VulnerabilityService vulnerabilityService, QualityGateService qualityGateService,
-                        AuditService auditService) {
+                        AuditService auditService, ApplicationService applicationService) {
         this.logIngestionService = logIngestionService;
         this.testService = testService;
         this.vulnerabilityService = vulnerabilityService;
         this.qualityGateService = qualityGateService;
         this.auditService = auditService;
+        this.applicationService = applicationService;
     }
 
     @PostMapping(value = "/logs", consumes = {MediaType.TEXT_PLAIN_VALUE, "application/x-ndjson", MediaType.APPLICATION_JSON_VALUE})
-    public ApiDtos.IngestResult logs(@RequestBody String raw, @RequestParam(required = false) String source) {
-        ApiDtos.IngestResult result = logIngestionService.ingestText(raw, source);
-        auditService.record("CI_LOGS", source == null ? "pipeline" : source, result.ingested() + " logs");
+    public ApiDtos.IngestResult logs(@RequestBody String raw, @RequestParam(required = false) String source,
+                                     @RequestParam(required = false) String app,
+                                     @RequestParam(required = false) String logType) {
+        ApiDtos.IngestResult result = logIngestionService.ingestText(raw, source, app, logType);
+        auditService.record("CI_LOGS", (source == null ? "pipeline" : source) + (app == null ? "" : " @ " + app),
+                result.ingested() + " logs" + (logType == null ? "" : " (" + logType + ")"));
         return result;
     }
 
@@ -69,19 +80,22 @@ public class CiController {
                                       @RequestPart(value = "coverage", required = false) MultipartFile coverage,
                                       @RequestParam(required = false) String branch,
                                       @RequestParam(required = false) String commit,
-                                      @RequestParam(required = false) String pipeline) throws Exception {
+                                      @RequestParam(required = false) String pipeline,
+                                      @RequestParam(required = false) String app) throws Exception {
         return testService.importReports(reports, coverage,
-                new TestRunHistoryService.RunMetadata("CI", branch, commit, pipeline, null, null, null, null));
+                new TestRunHistoryService.RunMetadata("CI", branch, commit, pipeline, null, null, null, null,
+                        app == null ? null : applicationService.resolve(app, null)));
     }
 
     @PostMapping(value = "/security/{type}", consumes = {MediaType.APPLICATION_JSON_VALUE, MediaType.TEXT_PLAIN_VALUE})
-    public ApiDtos.ScanDiff security(@PathVariable String type, @RequestBody String json) {
-        return vulnerabilityService.importReport(type, json);
+    public ApiDtos.ScanDiff security(@PathVariable String type, @RequestBody String json,
+                                    @RequestParam(required = false) String app) {
+        return vulnerabilityService.importReport(app == null ? null : applicationService.resolve(app, null), type, json);
     }
 
     @GetMapping("/quality-gate")
-    public ResponseEntity<ApiDtos.QualityGateResult> qualityGate() {
-        ApiDtos.QualityGateResult result = qualityGateService.evaluate();
+    public ResponseEntity<ApiDtos.QualityGateResult> qualityGate(@RequestParam(required = false) String app) {
+        ApiDtos.QualityGateResult result = qualityGateService.evaluate(app);
         return ResponseEntity.status("PASSED".equals(result.status()) ? 200 : 412).body(result);
     }
 }

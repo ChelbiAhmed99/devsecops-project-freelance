@@ -32,6 +32,12 @@
   <button role="tab" type="button" [class.active]="tab() === 'recommendations'" (click)="setTab('recommendations')">
     Recommandations @if (counts().pending) { <span class="count">{{ counts().pending }}</span> }
   </button>
+  <button role="tab" type="button" [class.active]="tab() === 'corrections'" (click)="setTab('corrections')">
+    Suivi des corrections @if (fixCounts().still) { <span class="count">{{ fixCounts().still }}</span> }
+  </button>
+  <button role="tab" type="button" [class.active]="tab() === 'jira'" (click)="setTab('jira')">
+    Actions Jira @if (pendingJira()) { <span class="count">{{ pendingJira() }}</span> }
+  </button>
 </nav>
 
 @if (tab() === 'copilot') {
@@ -64,7 +70,7 @@
       @if (messages().length) { <button class="btn btn--ghost" type="button" (click)="resetChat()">Effacer</button> }
     </form>
   </section>
-} @else {
+} @else if (tab() === 'recommendations') {
   <div class="toolbar">
     <div class="segmented" role="group" aria-label="Filtre de statut">
       <button type="button" [class.active]="statusFilter() === ''" (click)="statusFilter.set('')">Toutes ({{ counts().all }})</button>
@@ -102,5 +108,96 @@
     </article>
   } @empty {
     <p class="empty">{{ loading() ? 'Chargement des recommandations…' : 'Aucune recommandation dans cette catégorie.' }} @if (!loading()) { Demandez une explication depuis les écrans Logs, Tests ou Sécurité. }</p>
+  }
+} @else if (tab() === 'corrections') {
+  <details class="help help--inline" open>
+    <summary>Cycle de vie d'une correction</summary>
+    <div class="help__body">
+      <p>Détection → analyse d'origine (corrélation multi-couches) → correction proposée et expliquée par l'IA → <strong>validation humaine</strong>
+        → application par l'équipe (déclarée ici avec sa référence) → <strong>vérification automatique</strong> sur les données reçues après
+        l'application : l'anomalie a-t-elle disparu des logs, le test passe-t-il, la vulnérabilité est-elle fermée ?
+        L'assistant ne modifie jamais le code ni la production.</p>
+    </div>
+  </details>
+  <div class="toolbar">
+    <div class="segmented" role="group" aria-label="Filtre de vérification">
+      <button type="button" [class.active]="fixFilter() === 'ALL'" (click)="fixFilter.set('ALL')">Validées ({{ fixCounts().all }})</button>
+      <button type="button" [class.active]="fixFilter() === 'NONE'" (click)="fixFilter.set('NONE')">À appliquer ({{ fixCounts().none }})</button>
+      <button type="button" [class.active]="fixFilter() === 'APPLIED'" (click)="fixFilter.set('APPLIED')">En vérification ({{ fixCounts().applied }})</button>
+      <button type="button" [class.active]="fixFilter() === 'VERIFIED'" (click)="fixFilter.set('VERIFIED')">Vérifiées ({{ fixCounts().verified }})</button>
+      <button type="button" [class.active]="fixFilter() === 'STILL_PRESENT'" (click)="fixFilter.set('STILL_PRESENT')">Inefficaces ({{ fixCounts().still }})</button>
+    </div>
+    <button class="btn" type="button" (click)="loadRecommendations()">Actualiser</button>
+  </div>
+  @for (r of corrections(); track r.id) {
+    <article class="panel rec-card panel--{{ r.fixStatus === 'VERIFIED' ? 'ok' : r.fixStatus === 'STILL_PRESENT' ? 'critical' : 'medium' }}">
+      <app-correction-stepper [rec]="r" />
+      <p class="mono rec-card__incident">{{ r.incidentSummary }}</p>
+      <p class="muted">{{ typeLabel(r.incidentType) }}{{ r.applicationCode ? ' · ' + r.applicationCode : '' }} · validée par {{ r.reviewedBy }} {{ r.reviewedAt | relative }}</p>
+      @if (r.diagnostic) { <p class="advice"><strong>Origine :</strong> {{ r.diagnostic }}</p> }
+      <details><summary>Correction proposée</summary><pre class="rec__fix">{{ r.suggestedFix }}</pre></details>
+      @if (!r.appliedAt) {
+        <div class="review-row">
+          <input type="text" [(ngModel)]="references[r.id]" placeholder="Référence : commit, merge request, ticket…" aria-label="Référence" />
+          <button class="btn btn--primary" type="button" (click)="markApplied(r)">Déclarer appliquée</button>
+        </div>
+      } @else {
+        <p><span class="badge badge--{{ r.fixStatus === 'VERIFIED' ? 'ok' : r.fixStatus === 'STILL_PRESENT' ? 'critical' : 'medium' }}">{{ r.fixStatus | lbl: 'fix' }}</span>
+          <span class="muted">appliquée par {{ r.appliedBy }} {{ r.appliedAt | relative }} · réf. <code>{{ r.appliedReference }}</code>
+            @if (r.verifiedAt) { · vérifiée {{ r.verifiedAt | relative }} }</span></p>
+        @if (r.verificationDetails) { <p class="advice">{{ r.verificationDetails }}</p> }
+        @if (r.fixStatus !== 'VERIFIED') { <button class="btn btn--sm" type="button" (click)="verify(r)">Vérifier maintenant</button> }
+      }
+    </article>
+  } @empty {
+    <p class="empty">Aucune correction dans cette catégorie. Les recommandations validées apparaissent ici.</p>
+  }
+} @else {
+  @if (jiraStatus(); as js) {
+    <div class="alert alert--{{ js.mode === 'LIVE' ? 'info' : 'warn' }}">
+      @if (js.mode === 'LIVE') { Jira connecté ({{ js.deployment }}, {{ js.baseUrl }}). }
+      @else { Mode simulation : Jira n'est pas configuré, les actions approuvées sont tracées mais pas envoyées. }
+      @if (js.fourEyes) { Principe des quatre yeux actif : l'auteur d'une proposition ne peut pas l'approuver. }
+    </div>
+  }
+  <div class="toolbar">
+    <div class="segmented" role="group" aria-label="Filtre de statut Jira">
+      @for (f of ['PROPOSED', 'EXECUTED', 'SIMULATED', 'REJECTED', 'FAILED', '']; track f) {
+        <button type="button" [class.active]="jiraFilter() === f" (click)="jiraFilter.set(f)">{{ f ? (f | lbl) : 'Toutes' }}</button>
+      }
+    </div>
+    <button class="btn" type="button" (click)="loadJira()">Actualiser</button>
+  </div>
+  @for (a of filteredJira(); track a.id) {
+    <article class="panel panel--{{ a.status === 'PROPOSED' ? 'medium' : a.status === 'FAILED' || a.status === 'REJECTED' ? 'critical' : 'ok' }}">
+      <header class="anomaly__header">
+        <div>
+          <span class="badge badge--outline">#{{ a.id }} · {{ a.type === 'CREATE_ISSUE' ? 'Création de ticket' : 'Commentaire ' + a.issueKey }}</span>
+          <span class="badge badge--{{ a.status === 'PROPOSED' ? 'medium' : a.status === 'FAILED' || a.status === 'REJECTED' ? 'critical' : 'ok' }}">{{ a.status | lbl }}</span>
+          <span class="muted">proposée par {{ a.proposedBy }} {{ a.proposedAt | relative }}{{ a.applicationCode ? ' · ' + a.applicationCode : '' }}{{ a.projectKey ? ' · projet ' + a.projectKey : '' }}</span>
+        </div>
+        <button class="btn btn--sm" type="button" (click)="jiraOpen.set(jiraOpen() === a.id ? null : a.id)">{{ jiraOpen() === a.id ? 'Masquer' : 'Contenu' }}</button>
+      </header>
+      @if (a.summary) { <p><strong>{{ a.summary }}</strong></p> }
+      @if (jiraOpen() === a.id) { <pre class="code-block">{{ a.type === 'CREATE_ISSUE' ? a.description : a.comment }}</pre> }
+      @if (a.status === 'PROPOSED') {
+        @if (canApprove(a)) {
+          <div class="review-row">
+            <input type="text" [(ngModel)]="jiraComments[a.id]" placeholder="Commentaire (obligatoire pour un rejet)" aria-label="Commentaire" />
+            <button class="btn btn--primary" type="button" (click)="approveJira(a)">Approuver et exécuter</button>
+            <button class="btn" type="button" (click)="rejectJira(a)">Rejeter</button>
+          </div>
+        } @else {
+          <p class="muted">En attente d'approbation par un responsable qualité{{ jiraStatus()?.fourEyes ? " (autre que l'auteur)" : '' }}.</p>
+        }
+      } @else {
+        <p class="muted">{{ a.status | lbl }} par {{ a.decidedBy }} {{ a.decidedAt | relative }}{{ a.decisionComment ? ' — « ' + a.decisionComment + ' »' : '' }}
+          @if (a.resultKey) { · ticket <strong>{{ a.resultKey }}</strong> }
+          @if (a.resultUrl) { · <a [href]="a.resultUrl" target="_blank" rel="noopener">ouvrir</a> }</p>
+        @if (a.error) { <p class="muted">{{ a.error }}</p> }
+      }
+    </article>
+  } @empty {
+    <p class="empty">Aucune action Jira dans cette catégorie. Les propositions se font depuis les rapports de validation et l'écran Logs (bouton « Jira »).</p>
   }
 }

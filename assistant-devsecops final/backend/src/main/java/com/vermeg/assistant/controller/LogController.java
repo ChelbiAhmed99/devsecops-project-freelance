@@ -7,8 +7,10 @@ package com.vermeg.assistant.controller;
 
 import com.vermeg.assistant.model.AnomalyGroup;
 import com.vermeg.assistant.model.ApiDtos;
+import com.vermeg.assistant.model.Diagnostics;
 import com.vermeg.assistant.model.LogEntry;
 import com.vermeg.assistant.service.AuditService;
+import com.vermeg.assistant.service.DiagnosticService;
 import com.vermeg.assistant.service.LogIngestionService;
 import com.vermeg.assistant.service.LogQueryService;
 import com.vermeg.assistant.service.LogStore;
@@ -44,6 +46,8 @@ import java.util.Map;
  *   <li>GET    /api/logs/spikes          -> pics de fréquence (z-score robuste + IsolationForest)</li>
  *   <li>POST   /api/logs/ingest          -> ingestion texte brut</li>
  *   <li>POST   /api/logs/upload          -> ingestion d'un fichier</li>
+ *   <li>GET    /api/logs/incidents       -> incidents corrélés multi-couches + cause racine explicable (app optionnel)</li>
+ *   <li>GET    /api/logs/breakdown       -> volumes par couche (applicatif / serveur / CI) et par application</li>
  *   <li>DELETE /api/logs                 -> purge (ADMIN)</li>
  * </ul>
  */
@@ -56,14 +60,16 @@ public class LogController {
     private final LogIngestionService ingestionService;
     private final AuditService auditService;
     private final LokiLogPuller lokiLogPuller;
+    private final DiagnosticService diagnosticService;
 
     public LogController(LogStore logStore, LogQueryService queryService, LogIngestionService ingestionService,
-                         AuditService auditService, LokiLogPuller lokiLogPuller) {
+                         AuditService auditService, LokiLogPuller lokiLogPuller, DiagnosticService diagnosticService) {
         this.logStore = logStore;
         this.queryService = queryService;
         this.ingestionService = ingestionService;
         this.auditService = auditService;
         this.lokiLogPuller = lokiLogPuller;
+        this.diagnosticService = diagnosticService;
     }
 
     @GetMapping
@@ -78,8 +84,20 @@ public class LogController {
                                   @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
                                   @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
                                   @RequestParam(defaultValue = "0") int page,
-                                  @RequestParam(defaultValue = "50") int size) {
-        return queryService.search(level, source, q, from, to, page, size);
+                                  @RequestParam(defaultValue = "50") int size,
+                                  @RequestParam(required = false) String logType,
+                                  @RequestParam(required = false) String app) {
+        return queryService.search(level, source, q, from, to, page, size, logType, app);
+    }
+
+    @GetMapping("/incidents")
+    public List<Diagnostics.CorrelatedIncident> incidents(@RequestParam(required = false) String app) {
+        return diagnosticService.incidents(app);
+    }
+
+    @GetMapping("/breakdown")
+    public Map<String, Object> breakdown() {
+        return queryService.breakdown();
     }
 
     @GetMapping("/stats")
@@ -111,18 +129,24 @@ public class LogController {
     @PostMapping(value = "/ingest", consumes = {MediaType.TEXT_PLAIN_VALUE, MediaType.APPLICATION_JSON_VALUE,
             "application/x-ndjson"})
     public ApiDtos.IngestResult ingest(@RequestBody String rawLogs,
-                                       @RequestParam(required = false) String source) {
-        ApiDtos.IngestResult result = ingestionService.ingestText(rawLogs, source);
-        auditService.record("LOGS_INGEST", source == null ? "api" : source, result.ingested() + " logs");
+                                       @RequestParam(required = false) String source,
+                                       @RequestParam(required = false) String app,
+                                       @RequestParam(required = false) String logType) {
+        ApiDtos.IngestResult result = ingestionService.ingestText(rawLogs, source, app, logType);
+        auditService.record("LOGS_INGEST", (source == null ? "api" : source) + (app == null ? "" : " @ " + app),
+                result.ingested() + " logs" + (logType == null ? "" : " (" + logType + ")"));
         return result;
     }
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiDtos.IngestResult upload(@RequestPart("file") MultipartFile file,
-                                       @RequestParam(required = false) String source) throws IOException {
+                                       @RequestParam(required = false) String source,
+                                       @RequestParam(required = false) String app,
+                                       @RequestParam(required = false) String logType) throws IOException {
         try (InputStream in = file.getInputStream()) {
-            ApiDtos.IngestResult result = ingestionService.ingestStream(in, source);
-            auditService.record("LOGS_UPLOAD", file.getOriginalFilename(), result.ingested() + " logs");
+            ApiDtos.IngestResult result = ingestionService.ingestStream(in, source, app, logType);
+            auditService.record("LOGS_UPLOAD", file.getOriginalFilename() + (app == null ? "" : " @ " + app),
+                    result.ingested() + " logs" + (logType == null ? "" : " (" + logType + ")"));
             return result;
         }
     }

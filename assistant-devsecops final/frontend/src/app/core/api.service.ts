@@ -3,9 +3,12 @@ import { Injectable, inject } from '@angular/core';
 import { Observable, filter, retry, switchMap, take, takeWhile, timer } from 'rxjs';
 import { environment } from '../../environments/environment';
 import {
-  AiRecommendation, AnomalyGroup, AuditEntry, ChatMessage, ChatResponse, CorrelatedFailure, DashboardOverview,
-  ExplainRequest, FlakyTest, IngestResult, Job, LogPage, LogStats, QualityGateResult, ScanDiff, SpikeReport,
-  SystemTools, TestExecutionSummary, TestRunPoint, UserUpsert, UserView, Vulnerability, VulnerabilityStats,
+  AiRecommendation, AnomalyGroup, ApplicationUpsert, ApplicationValidationDetail, ApplicationValidationSummary,
+  ApplicationView, AuditEntry, ChatMessage, ChatResponse, CorrelatedFailure, CorrelatedIncident, DashboardOverview,
+  ExplainRequest, FlakyTest, IngestResult, JiraAction, JiraIncidentQuery, JiraMatch, JiraProposal, JiraStatus, Job,
+  LogBreakdown, LogPage, LogStats, LogType, PortfolioSummary, QualityGateResult, ScanDiff, SpikeReport, SystemTools,
+  TestExecutionSummary, TestRunPoint, UserUpsert, UserView, ValidationCampaign, Verdict, Vulnerability,
+  VulnerabilityStats,
 } from './models';
 
 export interface LogSearch {
@@ -16,6 +19,8 @@ export interface LogSearch {
   to?: string;
   page?: number;
   size?: number;
+  logType?: string;
+  app?: string;
 }
 
 export interface VulnFilter {
@@ -23,6 +28,7 @@ export interface VulnFilter {
   severity?: string;
   source?: string;
   q?: string;
+  app?: string;
 }
 
 /** Point d'accès unique à l'API REST du backend. */
@@ -65,17 +71,26 @@ export class ApiService {
     return this.http.get<SpikeReport>(`${this.base}/logs/spikes`);
   }
 
-  ingestLogs(raw: string, source?: string): Observable<IngestResult> {
+  ingestLogs(raw: string, source?: string, app?: string, logType?: LogType | ''): Observable<IngestResult> {
     return this.http.post<IngestResult>(`${this.base}/logs/ingest`, raw, {
       headers: { 'Content-Type': 'text/plain' },
-      params: toParams({ source }),
+      params: toParams({ source, app, logType }),
     });
   }
 
-  uploadLogs(file: File, source?: string): Observable<IngestResult> {
+  uploadLogs(file: File, source?: string, app?: string, logType?: LogType | ''): Observable<IngestResult> {
     const form = new FormData();
     form.append('file', file);
-    return this.http.post<IngestResult>(`${this.base}/logs/upload`, form, { params: toParams({ source }) });
+    return this.http.post<IngestResult>(`${this.base}/logs/upload`, form, { params: toParams({ source, app, logType }) });
+  }
+
+  /** Incidents corrélés multi-couches avec cause racine explicable (toutes applications si app est vide). */
+  incidents(app?: string | null): Observable<CorrelatedIncident[]> {
+    return this.http.get<CorrelatedIncident[]>(`${this.base}/logs/incidents`, { params: toParams({ app }) });
+  }
+
+  logBreakdown(): Observable<LogBreakdown> {
+    return this.http.get<LogBreakdown>(`${this.base}/logs/breakdown`);
   }
 
   clearLogs(): Observable<unknown> {
@@ -170,6 +185,95 @@ export class ApiService {
     });
   }
 
+  /** Une correction validée a été appliquée par un humain (référence obligatoire : commit, MR, ticket). */
+  markApplied(id: string, reference: string, comment?: string) {
+    return this.http.post<AiRecommendation>(`${this.base}/ai/recommendations/${id}/applied`, { reference, comment });
+  }
+
+  verifyCorrection(id: string) {
+    return this.http.post<AiRecommendation>(`${this.base}/ai/recommendations/${id}/verify`, {});
+  }
+
+  // ------------------------------------------------------------- applications
+  applications(includeInactive = false): Observable<ApplicationView[]> {
+    return this.http.get<ApplicationView[]>(`${this.base}/applications`, { params: { inactive: includeInactive } });
+  }
+
+  createApplication(app: ApplicationUpsert): Observable<ApplicationView> {
+    return this.http.post<ApplicationView>(`${this.base}/applications`, app);
+  }
+
+  updateApplication(code: string, app: ApplicationUpsert): Observable<ApplicationView> {
+    return this.http.put<ApplicationView>(`${this.base}/applications/${encodeURIComponent(code)}`, app);
+  }
+
+  applicationQualityGate(code: string): Observable<QualityGateResult> {
+    return this.http.get<QualityGateResult>(`${this.base}/applications/${encodeURIComponent(code)}/quality-gate`);
+  }
+
+  // --------------------------------------------------------------- validation
+  startValidation(applications: string[], mode: 'LATEST_RESULTS' | 'RUN_TESTS', useLlm: boolean, label?: string) {
+    return this.http.post<ValidationCampaign>(`${this.base}/validations/campaigns`, { applications, mode, useLlm, label });
+  }
+
+  campaigns(limit = 20): Observable<ValidationCampaign[]> {
+    return this.http.get<ValidationCampaign[]>(`${this.base}/validations/campaigns`, { params: { limit } });
+  }
+
+  campaign(id: number): Observable<ValidationCampaign> {
+    return this.http.get<ValidationCampaign>(`${this.base}/validations/campaigns/${id}`);
+  }
+
+  portfolio(): Observable<PortfolioSummary> {
+    return this.http.get<PortfolioSummary>(`${this.base}/validations/portfolio`);
+  }
+
+  validation(id: number): Observable<ApplicationValidationDetail> {
+    return this.http.get<ApplicationValidationDetail>(`${this.base}/validations/${id}`);
+  }
+
+  validationHistory(app: string, limit = 20): Observable<ApplicationValidationSummary[]> {
+    return this.http.get<ApplicationValidationSummary[]>(`${this.base}/validations/history`, { params: { app, limit } });
+  }
+
+  decideValidation(id: number, decision: 'CONFIRM' | 'OVERRIDE', verdict?: Verdict, comment?: string) {
+    return this.http.post<ApplicationValidationSummary>(`${this.base}/validations/${id}/decision`, { decision, verdict, comment });
+  }
+
+  /** Rapport d'une application (.md ou .html) ou archive ZIP des rapports d'une campagne. */
+  downloadValidation(path: string): Observable<Blob> {
+    return this.http.get(`${this.base}/validations/${path}`, { responseType: 'blob' });
+  }
+
+  // --------------------------------------------------------------------- Jira
+  jiraStatus(): Observable<JiraStatus> {
+    return this.http.get<JiraStatus>(`${this.base}/jira/status`);
+  }
+
+  jiraMatches(query: JiraIncidentQuery): Observable<JiraMatch[]> {
+    return this.http.post<JiraMatch[]>(`${this.base}/jira/matches`, query);
+  }
+
+  jiraDraft(query: JiraIncidentQuery, type: 'CREATE_ISSUE' | 'ADD_COMMENT', issueKey?: string): Observable<JiraProposal> {
+    return this.http.post<JiraProposal>(`${this.base}/jira/draft`, query, { params: toParams({ type, issueKey }) });
+  }
+
+  jiraPropose(proposal: JiraProposal): Observable<JiraAction> {
+    return this.http.post<JiraAction>(`${this.base}/jira/actions`, proposal);
+  }
+
+  jiraActions(status?: string, app?: string): Observable<JiraAction[]> {
+    return this.http.get<JiraAction[]>(`${this.base}/jira/actions`, { params: toParams({ status, app }) });
+  }
+
+  jiraApprove(id: number, comment?: string): Observable<JiraAction> {
+    return this.http.post<JiraAction>(`${this.base}/jira/actions/${id}/approve`, { comment });
+  }
+
+  jiraReject(id: number, comment: string): Observable<JiraAction> {
+    return this.http.post<JiraAction>(`${this.base}/jira/actions/${id}/reject`, { comment });
+  }
+
   // --------------------------------------------------------------------- jobs
   job(id: string): Observable<Job> {
     return this.http.get<Job>(`${this.base}/jobs/${id}`);
@@ -180,7 +284,7 @@ export class ApiService {
   }
 
   /** Job en cours d'un type donné, ou null : sert à reprendre le suivi après un rechargement de page. */
-  runningJob(type: 'tests' | 'scan-dependencies' | 'scan-image' | 'sync-sonar'): Observable<Job | null> {
+  runningJob(type: 'tests' | 'scan-dependencies' | 'scan-image' | 'sync-sonar' | 'validation'): Observable<Job | null> {
     return this.http.get<Job | null>(`${this.base}/jobs/running`, { params: { type } });
   }
 

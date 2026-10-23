@@ -9,9 +9,12 @@ const MAX_STORED = 200;
 /** Nombre de messages précédents envoyés au modèle comme contexte. */
 const MAX_HISTORY_SENT = 20;
 
+/** Onglets de l'écran Assistant IA. */
+export type AiTab = 'copilot' | 'recommendations' | 'corrections' | 'jira';
+
 interface PersistedState {
   messages: ChatMessage[];
-  tab: 'copilot' | 'recommendations';
+  tab: AiTab;
   statusFilter: ValidationStatus | '';
 }
 
@@ -33,7 +36,7 @@ export class AiChatStore {
 
   readonly messages = signal<ChatMessage[]>([]);
   readonly thinking = signal(false);
-  readonly tab = signal<'copilot' | 'recommendations'>('copilot');
+  readonly tab = signal<AiTab>('copilot');
   readonly statusFilter = signal<ValidationStatus | ''>('');
   /** Brouillon de la question en cours de saisie. */
   draft = '';

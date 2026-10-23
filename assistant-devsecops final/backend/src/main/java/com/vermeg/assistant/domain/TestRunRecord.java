@@ -10,6 +10,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 
 import java.time.LocalDateTime;
@@ -20,7 +21,7 @@ import java.time.LocalDateTime;
  * l'affichage, la corrélation et la détection de tests instables (flaky).
  */
 @Entity
-@Table(name = "test_run")
+@Table(name = "test_run", indexes = @Index(name = "idx_test_run_app", columnList = "application_code"))
 public class TestRunRecord {
 
     @Id
@@ -28,6 +29,10 @@ public class TestRunRecord {
     private Long id;
 
     private LocalDateTime executedAt;
+
+    /** Application à laquelle appartient l'exécution (multi-applications). */
+    @Column(name = "application_code", length = 60)
+    private String applicationCode;
     private LocalDateTime windowStart;
     private LocalDateTime windowEnd;
 
@@ -66,6 +71,8 @@ public class TestRunRecord {
     }
 
     public Long getId() { return id; }
+    public String getApplicationCode() { return applicationCode; }
+    public void setApplicationCode(String applicationCode) { this.applicationCode = applicationCode; }
     public LocalDateTime getExecutedAt() { return executedAt; }
     public void setExecutedAt(LocalDateTime executedAt) { this.executedAt = executedAt; }
     public LocalDateTime getWindowStart() { return windowStart; }

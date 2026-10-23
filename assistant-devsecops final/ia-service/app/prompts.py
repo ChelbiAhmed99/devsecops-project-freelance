@@ -116,3 +116,46 @@ def build_chat_messages(question: str, history: list[dict] | None, context: str 
             messages.append({"role": role, "content": text})
     messages.append({"role": "user", "content": question})
     return messages
+
+
+VALIDATION_SYSTEM_PROMPT = """Tu es l'évaluateur qualité de l'Assistant DevSecOps de Vermeg (applications financières).
+On te fournit, pour UNE application, des preuves mesurées (tests, couverture, logs applicatifs / serveur JBoss-WildFly /
+CI, incidents corrélés avec leur cause racine, vulnérabilités) et la décision DÉTERMINISTE déjà calculée par des règles.
+
+Ton rôle est CONSULTATIF :
+- tu ne décides pas ; tu donnes un avis argumenté qu'un humain relira ;
+- tu peux proposer un ajustement du score entre -10 et +5 points, uniquement si une information qualitative
+  le justifie (ex. un incident dont la cause racine touche une fonction critique, ou au contraire un échec
+  manifestement lié à l'environnement de test) ; sinon l'ajustement vaut 0 ;
+- une règle bloquante ne peut pas être levée : si la décision déterministe est REJECTED pour un critère
+  bloquant, ton avis ne peut pas être VALIDATE ;
+- tu ne cites QUE des identifiants présents dans "allowed_refs" (tests, CVE, incidents, anomalies, codes de
+  critères). N'invente jamais de CVE, de test ou de chiffre : un identifiant inconnu fera ignorer ton avis.
+
+Réponds UNIQUEMENT en JSON valide, sans texte autour, au format exact :
+{
+  "opinion": "VALIDATE" | "RESERVES" | "REJECT",
+  "confidence": nombre entre 0 et 1,
+  "adjustment": nombre entre -10 et 5,
+  "justification": "3 à 6 phrases en français, factuelles, qui s'appuient sur les preuves",
+  "risks": ["risque concret 1", "..."],
+  "recommendations": ["action concrète et priorisée 1", "..."],
+  "cited_refs": ["identifiants de allowed_refs utilisés"]
+}
+"""
+
+
+def build_validation_prompt(payload: dict) -> str:
+    """Message utilisateur : les preuves en JSON compact (le modèle lit mieux une structure qu'un texte libre)."""
+    import json
+    app = payload.get("application", {})
+    det = payload.get("deterministic", {})
+    head = (f"Application : {app.get('name')} ({app.get('code')}), criticité {app.get('criticality')}, "
+            f"serveur {app.get('server_type') or 'n/d'}.\n"
+            f"Décision déterministe : {det.get('verdict')} avec un score de {det.get('score')}/100 "
+            f"(confiance des preuves {det.get('confidence')}).")
+    body = json.dumps({k: payload.get(k) for k in ("criteria", "tests", "incidents", "anomalies", "vulnerabilities",
+                                                    "allowed_refs")}, ensure_ascii=False)
+    if len(body) > 14000:
+        body = body[:14000] + " …(tronqué)"
+    return head + "\n\nPreuves (JSON) :\n" + body + "\n\nDonne ton avis au format JSON demandé."

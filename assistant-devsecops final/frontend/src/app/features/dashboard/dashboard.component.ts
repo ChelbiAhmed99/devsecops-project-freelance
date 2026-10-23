@@ -5,16 +5,17 @@ import { debounceTime, filter } from 'rxjs';
 import { ApiService, errorMessage, saveBlob } from '../../core/api.service';
 import { EventsService } from '../../core/events.service';
 import { shortDateTime } from '../../core/format';
-import { DashboardOverview, ExplainRequest } from '../../core/models';
+import { DashboardOverview, ExplainRequest, PortfolioSummary } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { DonutChartComponent, DonutSlice, LineChartComponent, LineSeries, SEVERITY_COLORS } from '../../shared/charts';
 import { ExplainDialogComponent } from '../../shared/explain-dialog.component';
 import { SHARED_PIPES } from '../../shared/pipes';
+import { ScoreRingComponent } from '../../shared/score-ring.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [RouterLink, DonutChartComponent, LineChartComponent, ExplainDialogComponent, ...SHARED_PIPES],
+  imports: [RouterLink, DonutChartComponent, LineChartComponent, ExplainDialogComponent, ScoreRingComponent, ...SHARED_PIPES],
   templateUrl: './dashboard.component.html',
 })
 export class DashboardComponent implements OnInit {
@@ -26,6 +27,15 @@ export class DashboardComponent implements OnInit {
   readonly data = signal<DashboardOverview | null>(null);
   readonly error = signal<string | null>(null);
   readonly explain = signal<ExplainRequest | null>(null);
+  readonly portfolio = signal<PortfolioSummary | null>(null);
+  /** Les applications les plus à risque d'abord (pour l'encart du tableau de bord). */
+  readonly riskyApps = computed(() => {
+    const rank: Record<string, number> = { REJECTED: 0, INCONCLUSIVE: 1, VALIDATED_WITH_RESERVES: 2, VALIDATED: 3 };
+    return [...(this.portfolio()?.entries ?? [])]
+      .sort((a, b) => (a.lastValidation?.finalVerdict ? rank[a.lastValidation.finalVerdict] : 1.5)
+        - (b.lastValidation?.finalVerdict ? rank[b.lastValidation.finalVerdict] : 1.5))
+      .slice(0, 6);
+  });
 
   readonly healthClass = computed(() => {
     const s = this.data()?.healthScore ?? 0;
@@ -65,6 +75,7 @@ export class DashboardComponent implements OnInit {
   }
 
   load(): void {
+    this.api.portfolio().subscribe({ next: (p) => this.portfolio.set(p), error: () => this.portfolio.set(null) });
     this.api.overview().subscribe({
       next: (d) => {
         this.data.set(d);

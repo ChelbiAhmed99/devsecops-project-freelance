@@ -33,6 +33,23 @@ public class AiRecommendation {
     private LocalDateTime reviewedAt;
     private String reviewComment;
 
+    // --- Cycle de vie de la correction (après validation humaine) ---
+    private String applicationCode;
+    /** NONE -> APPLIED (déclarée appliquée par un humain) -> VERIFIED | STILL_PRESENT | NOT_ENOUGH_DATA. */
+    private FixStatus fixStatus = FixStatus.NONE;
+    private String appliedBy;
+    private LocalDateTime appliedAt;
+    /** Référence de la correction (commit, merge request, ticket...). */
+    private String appliedReference;
+    private LocalDateTime verifiedAt;
+    private String verificationDetails;
+    /** Diagnostic d'origine (cause racine probable, preuves) au moment de la proposition. */
+    private String diagnostic;
+
+    public enum FixStatus {
+        NONE, APPLIED, VERIFIED, STILL_PRESENT, NOT_ENOUGH_DATA
+    }
+
     public enum ValidationStatus {
         PENDING_REVIEW, APPROVED, REJECTED
     }
@@ -85,4 +102,20 @@ public class AiRecommendation {
     public void setReviewedAt(LocalDateTime reviewedAt) { this.reviewedAt = reviewedAt; }
     public String getReviewComment() { return reviewComment; }
     public void setReviewComment(String reviewComment) { this.reviewComment = reviewComment; }
+    public String getApplicationCode() { return applicationCode; }
+    public void setApplicationCode(String applicationCode) { this.applicationCode = applicationCode; }
+    public FixStatus getFixStatus() { return fixStatus; }
+    public void setFixStatus(FixStatus fixStatus) { this.fixStatus = fixStatus == null ? FixStatus.NONE : fixStatus; }
+    public String getAppliedBy() { return appliedBy; }
+    public void setAppliedBy(String appliedBy) { this.appliedBy = appliedBy; }
+    public LocalDateTime getAppliedAt() { return appliedAt; }
+    public void setAppliedAt(LocalDateTime appliedAt) { this.appliedAt = appliedAt; }
+    public String getAppliedReference() { return appliedReference; }
+    public void setAppliedReference(String appliedReference) { this.appliedReference = appliedReference; }
+    public LocalDateTime getVerifiedAt() { return verifiedAt; }
+    public void setVerifiedAt(LocalDateTime verifiedAt) { this.verifiedAt = verifiedAt; }
+    public String getVerificationDetails() { return verificationDetails; }
+    public void setVerificationDetails(String verificationDetails) { this.verificationDetails = verificationDetails; }
+    public String getDiagnostic() { return diagnostic; }
+    public void setDiagnostic(String diagnostic) { this.diagnostic = diagnostic; }
 }

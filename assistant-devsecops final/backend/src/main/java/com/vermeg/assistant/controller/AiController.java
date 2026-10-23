@@ -10,6 +10,7 @@ import com.vermeg.assistant.model.ApiDtos;
 import com.vermeg.assistant.service.AiClient;
 import com.vermeg.assistant.service.AiRecommendationStore;
 import com.vermeg.assistant.service.AiService;
+import com.vermeg.assistant.service.CorrectionService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,6 +33,8 @@ import java.util.NoSuchElementException;
  *   <li>GET   /api/ai/recommendations              -> liste (filtre status)</li>
  *   <li>GET   /api/ai/recommendations/{id}         -> détail</li>
  *   <li>PATCH /api/ai/recommendations/{id}/status  -> validation humaine (APPROVED / REJECTED + commentaire)</li>
+ *   <li>POST  /api/ai/recommendations/{id}/applied -> un humain déclare la correction appliquée (référence obligatoire)</li>
+ *   <li>POST  /api/ai/recommendations/{id}/verify  -> vérifie l'effet de la correction sur les nouvelles données</li>
  *   <li>POST  /api/ai/chat                         -> copilote conversationnel contextualisé</li>
  *   <li>GET   /api/ai/health                       -> état du service IA</li>
  * </ul>
@@ -43,11 +46,24 @@ public class AiController {
     private final AiService aiService;
     private final AiRecommendationStore store;
     private final AiClient aiClient;
+    private final CorrectionService correctionService;
 
-    public AiController(AiService aiService, AiRecommendationStore store, AiClient aiClient) {
+    public AiController(AiService aiService, AiRecommendationStore store, AiClient aiClient,
+                        CorrectionService correctionService) {
         this.aiService = aiService;
         this.store = store;
         this.aiClient = aiClient;
+        this.correctionService = correctionService;
+    }
+
+    @PostMapping("/recommendations/{id}/applied")
+    public AiRecommendation markApplied(@PathVariable String id, @RequestBody ApiDtos.AppliedRequest body) {
+        return correctionService.markApplied(id, body);
+    }
+
+    @PostMapping("/recommendations/{id}/verify")
+    public AiRecommendation verify(@PathVariable String id) {
+        return correctionService.verifyNow(id);
     }
 
     @PostMapping("/explain")

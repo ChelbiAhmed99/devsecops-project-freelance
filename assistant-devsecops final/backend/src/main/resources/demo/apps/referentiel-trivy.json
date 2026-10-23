@@ -1,0 +1,21 @@
+{
+ "SchemaVersion": 2,
+ "ArtifactName": "referentiel-clients:1.0",
+ "Results": [
+  {
+   "Target": "assistant-devsecops-backend:latest (alpine 3.19.1)",
+   "Class": "os-pkgs",
+   "Vulnerabilities": [
+    {
+     "VulnerabilityID": "CVE-2024-2511",
+     "PkgName": "libssl3",
+     "InstalledVersion": "3.1.4-r5",
+     "FixedVersion": "3.1.4-r6",
+     "Severity": "LOW",
+     "Title": "openssl: Unbounded memory growth with session handling in TLSv1.3",
+     "Description": "Some non-default TLS server configurations can cause unbounded memory growth."
+    }
+   ]
+  }
+ ]
+}
