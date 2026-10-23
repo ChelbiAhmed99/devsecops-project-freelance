@@ -1,3 +1,8 @@
+/**
+ * Role : exposer les endpoints REST lies aux comptes utilisateurs et deleguer leur traitement aux services.
+ * Contenu : definition de UserController et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.controller;
 
 import com.vermeg.assistant.model.ApiDtos;

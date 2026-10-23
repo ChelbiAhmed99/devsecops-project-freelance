@@ -1,3 +1,8 @@
+/**
+ * Role : definir les donnees echangees ou calculees pour le modele CorrelatedFailure.
+ * Contenu : definition de CorrelatedFailure et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.model;
 
 import java.util.List;

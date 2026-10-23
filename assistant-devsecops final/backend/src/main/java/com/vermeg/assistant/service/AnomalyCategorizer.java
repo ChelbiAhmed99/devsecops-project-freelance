@@ -1,3 +1,8 @@
+/**
+ * Role : classer les anomalies detectees dans les journaux.
+ * Contenu : definition de AnomalyCategorizer et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import java.util.LinkedHashMap;

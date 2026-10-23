@@ -1,5 +1,6 @@
 """
 Microservice IA de l'assistant DevSecOps (FastAPI).
+Rôle : exposer les API HTTP d'explication, de conversation et d'analyse ML.
 
 - POST /explain      : explication + correction d'un incident (log, test, vulnérabilité)
 - POST /chat         : copilote conversationnel alimenté par un instantané du projet
@@ -86,10 +87,12 @@ def chat(request: ChatRequest):
         try:
             messages = build_chat_messages(request.question, [t.model_dump() for t in request.history],
                                            request.context)
-            return ChatResponse(answer=llm.chat(messages), provider="groq", model=llm.DEFAULT_MODEL)
+            answer, model = llm.chat(messages)
+            return ChatResponse(answer=answer, provider="groq", model=model)
         except Exception:
-            logger.exception("Chat LLM en échec, repli sur le moteur heuristique")
-    return ChatResponse(answer=heuristics.chat(request.question, request.context),
+            logger.exception("Chat LLM en échec sur tous les modèles, repli sur le moteur heuristique")
+    return ChatResponse(answer=heuristics.chat(request.question, request.context,
+                                               [t.model_dump() for t in request.history]),
                         provider="heuristic", model=HEURISTIC_MODEL)
 
 

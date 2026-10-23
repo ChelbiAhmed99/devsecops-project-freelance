@@ -1,3 +1,8 @@
+/**
+ * Role : fournir le stockage des evenements de journalisation.
+ * Contenu : definition de LogStore et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import com.vermeg.assistant.domain.LogRecord;

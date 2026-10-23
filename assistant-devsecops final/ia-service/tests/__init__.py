@@ -1,0 +1,1 @@
+"""Rôle : identifier le dossier des tests automatisés du service IA comme package Python."""

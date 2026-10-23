@@ -1,3 +1,8 @@
+/**
+ * Role : lancer ou recuperer les analyses de dependances du projet.
+ * Contenu : definition de DependencyScanService et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import org.springframework.beans.factory.annotation.Value;

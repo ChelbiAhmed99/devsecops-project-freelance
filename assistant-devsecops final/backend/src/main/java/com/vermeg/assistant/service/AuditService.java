@@ -1,3 +1,8 @@
+/**
+ * Role : creer et consulter les evenements de tracabilite des actions.
+ * Contenu : definition de AuditService et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import com.vermeg.assistant.domain.AuditEvent;

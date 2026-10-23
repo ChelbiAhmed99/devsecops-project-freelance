@@ -1,3 +1,8 @@
+/**
+ * Role : recevoir et enregistrer les journaux entrants.
+ * Contenu : definition de LogIngestionService et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import com.vermeg.assistant.model.AnomalyGroup;

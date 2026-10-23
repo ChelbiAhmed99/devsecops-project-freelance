@@ -1,3 +1,8 @@
+/**
+ * Role : documenter le comportement attendu en verifiant les parseurs et detecteurs de donnees de tests et de journaux.
+ * Contenu : definition de ParsersAndDetectorsTests et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant;
 
 import com.vermeg.assistant.model.ApiDtos;

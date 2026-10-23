@@ -1,3 +1,8 @@
+/**
+ * Role : transformer les exceptions en reponses HTTP coherentes pour les API.
+ * Contenu : definition de GlobalExceptionHandler et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.config;
 
 import org.slf4j.Logger;

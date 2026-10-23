@@ -1,3 +1,8 @@
+/**
+ * Role : exposer les endpoints REST lies aux analyses de securite et deleguer leur traitement aux services.
+ * Contenu : definition de SecurityController et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.controller;
 
 import com.vermeg.assistant.model.ApiDtos;

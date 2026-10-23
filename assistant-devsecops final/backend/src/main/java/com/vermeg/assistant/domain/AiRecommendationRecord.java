@@ -1,3 +1,8 @@
+/**
+ * Role : representer et persister les donnees metier de AiRecommendation dans la base de donnees.
+ * Contenu : definition de AiRecommendationRecord et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.domain;
 
 import com.vermeg.assistant.model.AiRecommendation;

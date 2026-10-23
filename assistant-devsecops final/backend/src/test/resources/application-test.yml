@@ -1,3 +1,5 @@
+# Role : isoler la configuration des tests (base en memoire et integrations externes desactivees).
+
 spring:
   datasource:
     url: jdbc:h2:mem:assistant-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1

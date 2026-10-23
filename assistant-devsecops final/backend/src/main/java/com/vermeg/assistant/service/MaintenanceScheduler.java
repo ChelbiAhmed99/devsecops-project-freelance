@@ -1,3 +1,8 @@
+/**
+ * Role : planifier les taches periodiques de maintenance du backend.
+ * Contenu : definition de MaintenanceScheduler et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import org.slf4j.Logger;

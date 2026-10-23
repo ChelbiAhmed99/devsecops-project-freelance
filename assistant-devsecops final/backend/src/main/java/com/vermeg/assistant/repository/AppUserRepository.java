@@ -1,3 +1,8 @@
+/**
+ * Role : fournir l acces aux donnees persistees de AppUser via Spring Data.
+ * Contenu : definition de AppUserRepository et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.repository;
 
 import com.vermeg.assistant.domain.AppUser;

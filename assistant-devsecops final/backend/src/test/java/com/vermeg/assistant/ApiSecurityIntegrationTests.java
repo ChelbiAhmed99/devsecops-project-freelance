@@ -1,3 +1,8 @@
+/**
+ * Role : documenter le comportement attendu en verifiant les regles d authentification et d acces aux API.
+ * Contenu : definition de ApiSecurityIntegrationTests et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant;
 
 import com.fasterxml.jackson.databind.JsonNode;

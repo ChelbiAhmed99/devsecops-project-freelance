@@ -1,3 +1,8 @@
+/**
+ * Role : coordonner les analyses de securite du projet.
+ * Contenu : definition de SecurityScanService et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import com.vermeg.assistant.model.ApiDtos;

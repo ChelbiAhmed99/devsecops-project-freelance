@@ -1,9 +1,15 @@
-import { Component, ElementRef, OnInit, computed, inject, signal, viewChild } from '@angular/core';
+import { AfterViewInit, Component, DestroyRef, ElementRef, OnInit, computed, effect, inject, signal, viewChild } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
+import { AiChatStore } from '../../core/ai-chat.store';
 import { ApiService, errorMessage } from '../../core/api.service';
-import { AiRecommendation, ChatMessage, ValidationStatus } from '../../core/models';
+import { EventsService } from '../../core/events.service';
+import { AiRecommendation, ValidationStatus } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { SHARED_PIPES } from '../../shared/pipes';
+
+/** Ordre d'affichage dans la vue « Toutes » : ce qui attend une action d'abord. */
+const STATUS_ORDER: Record<ValidationStatus, number> = { PENDING_REVIEW: 0, APPROVED: 1, REJECTED: 2 };
 
 @Component({
   selector: 'app-ai',
@@ -11,20 +17,24 @@ import { SHARED_PIPES } from '../../shared/pipes';
   imports: [FormsModule, ...SHARED_PIPES],
   templateUrl: './ai.component.html',
 })
-export class AiComponent implements OnInit {
+export class AiComponent implements OnInit, AfterViewInit {
   private readonly api = inject(ApiService);
   private readonly toasts = inject(ToastService);
+  private readonly events = inject(EventsService);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly chatLog = viewChild<ElementRef<HTMLDivElement>>('chatLog');
 
-  readonly tab = signal<'copilot' | 'recommendations'>('copilot');
+  /** Conversation, onglet et filtre conservés entre les écrans et les sessions. */
+  readonly store = inject(AiChatStore);
+  readonly tab = this.store.tab;
+  readonly statusFilter = this.store.statusFilter;
+  readonly messages = this.store.messages;
+  readonly thinking = this.store.thinking;
+
   readonly recommendations = signal<AiRecommendation[]>([]);
-  readonly statusFilter = signal<ValidationStatus | ''>('PENDING_REVIEW');
+  readonly loading = signal(false);
   readonly comments: Record<string, string> = {};
   readonly health = signal<{ status: string; provider?: string; model?: string } | null>(null);
-
-  readonly messages = signal<ChatMessage[]>([]);
-  readonly thinking = signal(false);
-  question = '';
 
   readonly suggestions = [
     'Quelles sont les priorités à traiter aujourd\'hui ?',
@@ -33,28 +43,68 @@ export class AiComponent implements OnInit {
     'Quels services produisent le plus d\'anomalies ?',
   ];
 
+  get question(): string {
+    return this.store.draft;
+  }
+  set question(v: string) {
+    this.store.draft = v;
+  }
+
   readonly filtered = computed(() => {
     const f = this.statusFilter();
-    return f ? this.recommendations().filter((r) => r.status === f) : this.recommendations();
+    const list = f ? this.recommendations().filter((r) => r.status === f) : [...this.recommendations()];
+    return list.sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status]
+      || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   });
   readonly counts = computed(() => {
     const list = this.recommendations();
     return {
+      all: list.length,
       pending: list.filter((r) => r.status === 'PENDING_REVIEW').length,
       approved: list.filter((r) => r.status === 'APPROVED').length,
       rejected: list.filter((r) => r.status === 'REJECTED').length,
     };
   });
 
+  constructor() {
+    // Fait défiler le chat jusqu'au dernier message à chaque nouveau message.
+    effect(() => {
+      this.messages();
+      this.thinking();
+      this.scrollChat();
+    });
+  }
+
   ngOnInit(): void {
     this.loadRecommendations();
     this.api.aiHealth().subscribe({ next: (h) => this.health.set(h), error: () => this.health.set({ status: 'DOWN' }) });
+    // Rafraîchit la liste dès qu'un traitement se termine côté serveur (nouvelles fiches possibles).
+    this.events.events$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((e) => {
+      if (e.type !== 'logs.ingested') this.loadRecommendations(true);
+    });
   }
 
-  loadRecommendations(): void {
+  ngAfterViewInit(): void {
+    this.scrollChat();
+  }
+
+  setTab(t: 'copilot' | 'recommendations'): void {
+    this.tab.set(t);
+    if (t === 'recommendations') this.loadRecommendations();
+    else this.scrollChat();
+  }
+
+  loadRecommendations(silent = false): void {
+    if (!silent) this.loading.set(true);
     this.api.recommendations().subscribe({
-      next: (r) => this.recommendations.set(r),
-      error: (e) => this.toasts.error('Recommandations indisponibles', errorMessage(e)),
+      next: (r) => {
+        this.recommendations.set(r);
+        this.loading.set(false);
+      },
+      error: (e) => {
+        this.loading.set(false);
+        if (!silent) this.toasts.error('Recommandations indisponibles', errorMessage(e));
+      },
     });
   }
 
@@ -62,36 +112,22 @@ export class AiComponent implements OnInit {
     this.api.reviewRecommendation(r.id, status, this.comments[r.id] || undefined).subscribe({
       next: () => {
         this.toasts.success(status === 'APPROVED' ? 'Recommandation validée' : 'Recommandation rejetée');
-        this.loadRecommendations();
+        delete this.comments[r.id];
+        this.loadRecommendations(true);
       },
       error: (e) => this.toasts.error('Échec', errorMessage(e)),
     });
   }
 
   ask(text?: string): void {
-    const question = (text ?? this.question).trim();
-    if (!question || this.thinking()) return;
-    const history = this.messages();
-    this.messages.update((m) => [...m, { role: 'user', content: question }]);
-    this.question = '';
-    this.thinking.set(true);
-    this.scrollChat();
-    this.api.chat(question, history).subscribe({
-      next: (res) => {
-        this.messages.update((m) => [...m, { role: 'assistant', content: res.answer, provider: `${res.provider} · ${res.model}` }]);
-        this.thinking.set(false);
-        this.scrollChat();
-      },
-      error: (e) => {
-        this.messages.update((m) => [...m, { role: 'assistant', content: `⚠️ ${errorMessage(e)}`, provider: 'erreur' }]);
-        this.thinking.set(false);
-        this.scrollChat();
-      },
-    });
+    const q = text ?? this.question;
+    if (!q.trim() || this.thinking()) return;
+    this.store.ask(q);
+    if (text === undefined) this.question = '';
   }
 
   resetChat(): void {
-    this.messages.set([]);
+    if (confirmClear()) this.store.clear();
   }
 
   typeLabel(t: string): string {
@@ -104,4 +140,8 @@ export class AiComponent implements OnInit {
       if (el) el.scrollTop = el.scrollHeight;
     });
   }
+}
+
+function confirmClear(): boolean {
+  return typeof window === 'undefined' || window.confirm('Effacer toute la conversation avec le copilote ?');
 }

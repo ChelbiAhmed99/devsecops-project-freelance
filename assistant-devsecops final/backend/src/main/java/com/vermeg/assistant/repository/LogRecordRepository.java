@@ -1,3 +1,8 @@
+/**
+ * Role : fournir l acces aux donnees persistees de LogRecord via Spring Data.
+ * Contenu : definition de LogRecordRepository et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.repository;
 
 import com.vermeg.assistant.domain.LogRecord;

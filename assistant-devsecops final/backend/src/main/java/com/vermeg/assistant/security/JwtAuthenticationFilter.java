@@ -1,3 +1,8 @@
+/**
+ * Role : fournir le composant de securite JwtAuthenticationFilter, utilise pour l authentification, les autorisations ou la gestion des acces.
+ * Contenu : definition de JwtAuthenticationFilter et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.security;
 
 import jakarta.servlet.FilterChain;

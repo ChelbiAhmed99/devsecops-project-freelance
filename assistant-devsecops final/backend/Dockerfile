@@ -1,4 +1,5 @@
 # syntax=docker/dockerfile:1
+# Role : construire l image executable du backend et preparer son environnement de lancement.
 # ---------------------------------------------------------------------------
 # Étape 1 : build de l'application (cache Maven réutilisé entre les builds)
 # ---------------------------------------------------------------------------

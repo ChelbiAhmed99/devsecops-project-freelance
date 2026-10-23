@@ -1,3 +1,8 @@
+/**
+ * Role : recuperer periodiquement les journaux depuis Loki.
+ * Contenu : definition de LokiLogPuller et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import com.fasterxml.jackson.databind.JsonNode;

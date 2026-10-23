@@ -1,3 +1,8 @@
+/**
+ * Role : configurer la documentation OpenAPI/Swagger des endpoints.
+ * Contenu : definition de OpenApiConfig et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.config;
 
 import io.swagger.v3.oas.models.Components;

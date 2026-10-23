@@ -1,3 +1,8 @@
+/**
+ * Role : documenter le comportement attendu en verifiant la conversion des resultats Trivy en modeles internes.
+ * Contenu : definition de TrivyReportMapperTests et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant;
 
 import com.vermeg.assistant.model.Vulnerability;

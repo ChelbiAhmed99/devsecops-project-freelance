@@ -1,3 +1,8 @@
+/**
+ * Role : definir les regles de securite, les filtres et les acces HTTP.
+ * Contenu : definition de SecurityConfig et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.config;
 
 import com.vermeg.assistant.security.ApiKeyAuthenticationFilter;

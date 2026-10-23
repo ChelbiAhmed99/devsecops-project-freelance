@@ -1,3 +1,8 @@
+/**
+ * Role : convertir les problemes SonarQube en modeles internes.
+ * Contenu : definition de SonarIssueMapper et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import com.fasterxml.jackson.databind.JsonNode;

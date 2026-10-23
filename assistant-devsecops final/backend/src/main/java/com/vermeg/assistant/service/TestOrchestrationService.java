@@ -1,3 +1,8 @@
+/**
+ * Role : coordonner les differentes etapes d une campagne de tests.
+ * Contenu : definition de TestOrchestrationService et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import com.vermeg.assistant.domain.TestRunRecord;

@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Rôle : exemple Surefire sans échec, utilisé pour illustrer l'import et l'analyse des résultats. -->
 <testsuites>
   <testsuite name="com.vermeg.demo.PaymentServiceTests" tests="3" failures="0" errors="0" skipped="0" time="1.200">
     <testcase name="shouldProcessPayment" classname="com.vermeg.demo.PaymentServiceTests" time="0.12"/>

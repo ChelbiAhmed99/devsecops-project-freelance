@@ -1,0 +1,1 @@
+"""Rôle : regrouper les modules de l'application FastAPI du service IA."""

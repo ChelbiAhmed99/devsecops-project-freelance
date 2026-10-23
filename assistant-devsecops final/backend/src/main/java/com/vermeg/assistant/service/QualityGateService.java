@@ -1,3 +1,8 @@
+/**
+ * Role : evaluer les resultats selon les seuils de qualite configures.
+ * Contenu : definition de QualityGateService et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import com.vermeg.assistant.model.AnomalyGroup;

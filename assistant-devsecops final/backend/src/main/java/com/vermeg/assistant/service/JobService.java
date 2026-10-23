@@ -1,3 +1,8 @@
+/**
+ * Role : gerer les informations et operations liees aux jobs CI/CD.
+ * Contenu : definition de JobService et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import com.vermeg.assistant.security.CurrentUser;

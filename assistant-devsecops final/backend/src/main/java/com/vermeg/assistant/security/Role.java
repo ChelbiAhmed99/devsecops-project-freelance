@@ -1,3 +1,8 @@
+/**
+ * Role : fournir le composant de securite Role, utilise pour l authentification, les autorisations ou la gestion des acces.
+ * Contenu : definition de Role et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.security;
 
 /**

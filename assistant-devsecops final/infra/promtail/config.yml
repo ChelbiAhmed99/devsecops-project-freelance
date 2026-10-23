@@ -1,4 +1,4 @@
-# Collecte les logs des conteneurs portant le label "logging=promtail" et les envoie à Loki.
+# Rôle : configurer Promtail pour découvrir les conteneurs étiquetés et transmettre leurs logs à Loki.
 server:
   http_listen_port: 9080
 positions:

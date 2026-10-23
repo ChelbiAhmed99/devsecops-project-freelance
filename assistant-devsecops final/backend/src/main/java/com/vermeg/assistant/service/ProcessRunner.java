@@ -1,3 +1,8 @@
+/**
+ * Role : executer des commandes externes utilisees par les analyses et les tests.
+ * Contenu : definition de ProcessRunner et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import java.io.ByteArrayOutputStream;

@@ -1,4 +1,4 @@
-"""Tests des modèles scikit-learn (clustering de messages et détection d'outliers)."""
+"""Rôle : tester le clustering des messages et la détection d'anomalies par ML."""
 import random
 
 from app.ml import cluster_messages, detect_outliers

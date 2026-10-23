@@ -1,3 +1,8 @@
+/**
+ * Role : definir les donnees echangees ou calculees pour le modele AiRecommendation.
+ * Contenu : definition de AiRecommendation et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.model;
 
 import java.time.LocalDateTime;

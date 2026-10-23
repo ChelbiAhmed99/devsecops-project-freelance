@@ -1,3 +1,8 @@
+/**
+ * Role : representer et persister les donnees metier de Log dans la base de donnees.
+ * Contenu : definition de LogRecord et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.domain;
 
 import com.vermeg.assistant.model.LogEntry;

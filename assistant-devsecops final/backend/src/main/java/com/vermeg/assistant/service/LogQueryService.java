@@ -1,3 +1,8 @@
+/**
+ * Role : rechercher et filtrer les journaux enregistres.
+ * Contenu : definition de LogQueryService et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import com.vermeg.assistant.domain.LogRecord;

@@ -1,3 +1,5 @@
+# Role : exclure du contexte Docker les fichiers locaux ou generes qui ne doivent pas entrer dans l image.
+
 target/
 data/
 *.log

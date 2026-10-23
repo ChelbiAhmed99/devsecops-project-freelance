@@ -1,3 +1,8 @@
+/**
+ * Role : fournir le composant de securite LoginAttemptService, utilise pour l authentification, les autorisations ou la gestion des acces.
+ * Contenu : definition de LoginAttemptService et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.security;
 
 import org.springframework.beans.factory.annotation.Value;

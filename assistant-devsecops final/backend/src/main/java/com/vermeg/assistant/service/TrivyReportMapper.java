@@ -1,3 +1,8 @@
+/**
+ * Role : convertir les resultats Trivy en vulnerabilites internes.
+ * Contenu : definition de TrivyReportMapper et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import com.fasterxml.jackson.databind.JsonNode;

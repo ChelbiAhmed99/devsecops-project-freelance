@@ -1,3 +1,8 @@
+/**
+ * Role : produire une synthese lisible des anomalies observees.
+ * Contenu : definition de AnomalySummaryService et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import com.vermeg.assistant.model.AnomalyGroup;

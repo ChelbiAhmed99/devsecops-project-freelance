@@ -1,3 +1,8 @@
+/**
+ * Role : lire les rapports OWASP Dependency-Check et en extraire les vulnerabilites.
+ * Contenu : definition de DependencyCheckReportParser et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import com.fasterxml.jackson.databind.JsonNode;

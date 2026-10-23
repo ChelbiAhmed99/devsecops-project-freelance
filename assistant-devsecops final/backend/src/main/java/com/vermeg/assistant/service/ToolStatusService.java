@@ -1,3 +1,8 @@
+/**
+ * Role : exposer l etat de disponibilite des outils integres.
+ * Contenu : definition de ToolStatusService et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import org.springframework.beans.factory.annotation.Value;

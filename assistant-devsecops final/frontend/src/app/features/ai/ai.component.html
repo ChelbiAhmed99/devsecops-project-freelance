@@ -28,8 +28,8 @@
 </details>
 
 <nav class="tabs" role="tablist">
-  <button role="tab" type="button" [class.active]="tab() === 'copilot'" (click)="tab.set('copilot')">Copilote</button>
-  <button role="tab" type="button" [class.active]="tab() === 'recommendations'" (click)="tab.set('recommendations')">
+  <button role="tab" type="button" [class.active]="tab() === 'copilot'" (click)="setTab('copilot')">Copilote</button>
+  <button role="tab" type="button" [class.active]="tab() === 'recommendations'" (click)="setTab('recommendations')">
     Recommandations @if (counts().pending) { <span class="count">{{ counts().pending }}</span> }
   </button>
 </nav>
@@ -67,12 +67,12 @@
 } @else {
   <div class="toolbar">
     <div class="segmented" role="group" aria-label="Filtre de statut">
+      <button type="button" [class.active]="statusFilter() === ''" (click)="statusFilter.set('')">Toutes ({{ counts().all }})</button>
       <button type="button" [class.active]="statusFilter() === 'PENDING_REVIEW'" (click)="statusFilter.set('PENDING_REVIEW')">À valider ({{ counts().pending }})</button>
       <button type="button" [class.active]="statusFilter() === 'APPROVED'" (click)="statusFilter.set('APPROVED')">Validées ({{ counts().approved }})</button>
       <button type="button" [class.active]="statusFilter() === 'REJECTED'" (click)="statusFilter.set('REJECTED')">Rejetées ({{ counts().rejected }})</button>
-      <button type="button" [class.active]="statusFilter() === ''" (click)="statusFilter.set('')">Toutes</button>
     </div>
-    <button class="btn" type="button" (click)="loadRecommendations()">Actualiser</button>
+    <button class="btn" type="button" (click)="loadRecommendations()" [disabled]="loading()">{{ loading() ? 'Chargement…' : 'Actualiser' }}</button>
   </div>
 
   @for (r of filtered(); track r.id) {
@@ -101,6 +101,6 @@
       }
     </article>
   } @empty {
-    <p class="empty">Aucune recommandation dans cette catégorie. Demandez une explication depuis les écrans Logs, Tests ou Sécurité.</p>
+    <p class="empty">{{ loading() ? 'Chargement des recommandations…' : 'Aucune recommandation dans cette catégorie.' }} @if (!loading()) { Demandez une explication depuis les écrans Logs, Tests ou Sécurité. }</p>
   }
 }

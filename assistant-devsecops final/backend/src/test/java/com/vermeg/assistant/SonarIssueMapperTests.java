@@ -1,3 +1,8 @@
+/**
+ * Role : documenter le comportement attendu en verifiant la conversion des problemes SonarQube en modeles internes.
+ * Contenu : definition de SonarIssueMapperTests et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant;
 
 import com.fasterxml.jackson.databind.JsonNode;

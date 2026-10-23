@@ -1,3 +1,8 @@
+/**
+ * Role : conserver et consulter l historique des executions de tests.
+ * Contenu : definition de TestRunHistoryService et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;

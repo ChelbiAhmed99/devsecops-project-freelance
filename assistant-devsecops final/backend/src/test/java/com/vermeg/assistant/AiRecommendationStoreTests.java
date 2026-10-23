@@ -1,3 +1,8 @@
+/**
+ * Role : documenter le comportement attendu en verifiant l enregistrement et la consultation des recommandations IA.
+ * Contenu : definition de AiRecommendationStoreTests et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant;
 
 import com.vermeg.assistant.model.AiRecommendation;

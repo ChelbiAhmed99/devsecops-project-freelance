@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <!DOCTYPE report PUBLIC "-//JACOCO//DTD Report 1.1//EN" "report.dtd">
+<!-- Rôle : exemple JaCoCo de couverture de code utilisé pour illustrer l'import des métriques de tests. -->
 <report name="exemple">
   <counter type="INSTRUCTION" missed="2210" covered="6120"/>
   <counter type="BRANCH" missed="188" covered="252"/>

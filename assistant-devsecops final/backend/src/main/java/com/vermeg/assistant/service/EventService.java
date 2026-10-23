@@ -1,3 +1,8 @@
+/**
+ * Role : gerer les evenements exposes aux autres composants du backend.
+ * Contenu : definition de EventService et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;

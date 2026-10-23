@@ -1,3 +1,8 @@
+/**
+ * Role : definir les donnees echangees ou calculees pour le modele TestCaseResult.
+ * Contenu : definition de TestCaseResult et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.model;
 
 /** Résultat d'un test individuel extrait d'un rapport Surefire. */

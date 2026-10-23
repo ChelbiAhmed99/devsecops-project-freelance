@@ -1,4 +1,4 @@
-"""Contrats d'échange JSON (validés par Pydantic) entre le backend et le service IA."""
+"""Rôle : définir les contrats JSON validés par Pydantic entre le backend et le service IA."""
 from typing import Literal, Optional
 
 from pydantic import BaseModel, Field

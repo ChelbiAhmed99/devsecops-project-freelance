@@ -264,4 +264,3 @@ export function errorMessage(err: unknown): string {
   if (e?.status === 403) return 'Action non autorisée pour votre rôle.';
   return e?.message ?? 'Erreur inattendue';
 }
-

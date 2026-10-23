@@ -1,5 +1,6 @@
 """
 Modèles de machine learning (scikit-learn) utilisés par le backend :
+Rôle : regrouper les messages d'erreur et détecter les fenêtres temporelles atypiques.
 
 - cluster_messages : regroupement sémantique de messages d'erreur normalisés
   (TF-IDF sur mots + n-grammes de caractères, DBSCAN en distance cosinus).

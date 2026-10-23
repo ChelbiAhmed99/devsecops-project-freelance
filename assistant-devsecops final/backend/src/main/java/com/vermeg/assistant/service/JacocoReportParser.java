@@ -1,3 +1,8 @@
+/**
+ * Role : extraire les mesures de couverture depuis le rapport JaCoCo.
+ * Contenu : definition de JacocoReportParser et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import org.springframework.stereotype.Service;

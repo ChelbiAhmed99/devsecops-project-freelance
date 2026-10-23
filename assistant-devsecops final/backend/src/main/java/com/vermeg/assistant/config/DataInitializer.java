@@ -1,3 +1,8 @@
+/**
+ * Role : preparer les donnees initiales et les comptes de demonstration au demarrage.
+ * Contenu : definition de DataInitializer et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.config;
 
 import com.vermeg.assistant.domain.AppUser;

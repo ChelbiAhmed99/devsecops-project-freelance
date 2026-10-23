@@ -1,3 +1,8 @@
+/**
+ * Role : representer et persister les donnees metier de AuditEvent dans la base de donnees.
+ * Contenu : definition de AuditEvent et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.domain;
 
 import jakarta.persistence.Column;

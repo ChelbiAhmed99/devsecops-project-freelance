@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Rôle : transmettre les rapports de tests, couverture et sécurité du pipeline CI/CD au backend.
 # -----------------------------------------------------------------------------
 # Publie les résultats d'un pipeline CI/CD vers l'Assistant DevSecOps puis
 # applique la quality gate (le job échoue si elle n'est pas franchie).

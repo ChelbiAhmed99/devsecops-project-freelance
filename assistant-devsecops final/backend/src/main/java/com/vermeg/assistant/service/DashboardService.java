@@ -1,3 +1,8 @@
+/**
+ * Role : rassembler les indicateurs utilises par le tableau de bord.
+ * Contenu : definition de DashboardService et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import com.vermeg.assistant.model.AiRecommendation;
@@ -52,6 +57,23 @@ public class DashboardService {
         this.sonarIssueFetcher = sonarIssueFetcher;
     }
 
+    /** Score de santé (0-100) : pénalités plafonnées par brique (partagé avec le copilote IA). */
+    public static int computeHealth(long criticalVulns, long highVulns, TestExecutionSummary tests,
+                                    long criticalAnomalies, int spikes) {
+        double penalty = 0;
+        penalty += Math.min(40, criticalVulns * 15 + highVulns * 4);
+        if (tests != null && tests.getTotalTests() > 0) {
+            penalty += Math.min(25, (100 - tests.getSuccessRatePercent()) * 0.8);
+        }
+        penalty += Math.min(20, criticalAnomalies * 5);
+        penalty += Math.min(10, spikes * 2);
+        return (int) Math.max(0, Math.round(100 - penalty));
+    }
+
+    public static String healthLabel(int health) {
+        return health >= 80 ? "Bon" : health >= 60 ? "À surveiller" : health >= 40 ? "Dégradé" : "Critique";
+    }
+
     public Map<String, Object> overview() {
         List<LogEntry> logs = logStore.getAll();
         List<AnomalyGroup> anomalies = analysisService.detectAnomalies(logs);
@@ -65,16 +87,8 @@ public class DashboardService {
         long criticalVulns = vulnStats.openBySeverity().getOrDefault("CRITICAL", 0L);
         long highVulns = vulnStats.openBySeverity().getOrDefault("HIGH", 0L);
 
-        // ---- Score de santé (0-100) : pénalités plafonnées par brique ----
-        double penalty = 0;
-        penalty += Math.min(40, criticalVulns * 15 + highVulns * 4);
-        if (tests.getTotalTests() > 0) {
-            penalty += Math.min(25, (100 - tests.getSuccessRatePercent()) * 0.8);
-        }
-        penalty += Math.min(20, criticalAnomalies * 5);
-        penalty += Math.min(10, spikes * 2);
-        int health = (int) Math.max(0, Math.round(100 - penalty));
-        String label = health >= 80 ? "Bon" : health >= 60 ? "À surveiller" : health >= 40 ? "Dégradé" : "Critique";
+        int health = computeHealth(criticalVulns, highVulns, tests, criticalAnomalies, spikes);
+        String label = healthLabel(health);
 
         Map<String, Object> logsBlock = new LinkedHashMap<>();
         logsBlock.put("total", logStore.size());

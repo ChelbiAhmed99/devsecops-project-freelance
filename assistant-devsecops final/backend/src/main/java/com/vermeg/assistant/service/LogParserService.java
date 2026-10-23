@@ -1,3 +1,8 @@
+/**
+ * Role : convertir les lignes de journaux en objets structures.
+ * Contenu : definition de LogParserService et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import com.fasterxml.jackson.databind.JsonNode;

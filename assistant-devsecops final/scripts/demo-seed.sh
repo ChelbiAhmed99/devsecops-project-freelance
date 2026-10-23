@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Rôle : injecter un incident fictif dans le backend afin de démontrer les notifications de la plateforme.
 # Injecte un incident de démonstration dans une instance en cours d'exécution
 # (utile pendant une soutenance pour voir les notifications temps réel).
 # Usage : ./scripts/demo-seed.sh [http://localhost:8080] [utilisateur] [mot_de_passe]

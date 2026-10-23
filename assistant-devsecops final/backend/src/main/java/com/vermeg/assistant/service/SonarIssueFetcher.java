@@ -1,3 +1,8 @@
+/**
+ * Role : recuperer les problemes de qualite et de securite depuis SonarQube.
+ * Contenu : definition de SonarIssueFetcher et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import com.fasterxml.jackson.databind.JsonNode;

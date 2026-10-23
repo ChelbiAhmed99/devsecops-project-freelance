@@ -1,5 +1,6 @@
 """
 Tests unitaires du service IA (Sprint 8-9).
+Rôle : vérifier la construction des prompts et le parsing des réponses du modèle.
 
 Ne teste QUE la logique locale (construction de prompt, parsing défensif
 du JSON) : aucun appel réel au LLM (Groq) n'est fait ici, pour que ces

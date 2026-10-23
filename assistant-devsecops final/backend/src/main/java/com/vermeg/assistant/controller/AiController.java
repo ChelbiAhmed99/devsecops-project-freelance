@@ -1,3 +1,8 @@
+/**
+ * Role : exposer les endpoints REST lies aux fonctionnalites IA et deleguer leur traitement aux services.
+ * Contenu : definition de AiController et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.controller;
 
 import com.vermeg.assistant.model.AiRecommendation;

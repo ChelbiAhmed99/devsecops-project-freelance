@@ -1,3 +1,8 @@
+/**
+ * Role : gerer les operations metier liees aux comptes utilisateurs.
+ * Contenu : definition de UserService et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import com.vermeg.assistant.domain.AppUser;

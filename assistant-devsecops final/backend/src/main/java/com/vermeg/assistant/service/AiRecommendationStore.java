@@ -1,3 +1,8 @@
+/**
+ * Role : enregistrer et retrouver les recommandations generees par l assistant.
+ * Contenu : definition de AiRecommendationStore et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import com.vermeg.assistant.domain.AiRecommendationRecord;

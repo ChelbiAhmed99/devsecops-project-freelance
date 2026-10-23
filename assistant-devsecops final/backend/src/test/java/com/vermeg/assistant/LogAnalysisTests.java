@@ -1,3 +1,8 @@
+/**
+ * Role : documenter le comportement attendu en verifiant les analyses et detections effectuees sur les journaux.
+ * Contenu : definition de LogAnalysisTests et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant;
 
 import com.vermeg.assistant.model.AnomalyGroup;

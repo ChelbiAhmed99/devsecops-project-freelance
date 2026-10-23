@@ -1,3 +1,8 @@
+/**
+ * Role : documenter le comportement attendu en verifiant le rapprochement entre echecs de tests et journaux.
+ * Contenu : definition de TestLogCorrelationTests et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant;
 
 import com.vermeg.assistant.model.CorrelatedFailure;

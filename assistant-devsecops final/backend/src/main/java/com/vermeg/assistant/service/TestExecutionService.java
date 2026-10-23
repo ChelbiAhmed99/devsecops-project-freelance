@@ -1,3 +1,8 @@
+/**
+ * Role : declencher et suivre l execution des tests du projet.
+ * Contenu : definition de TestExecutionService et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import org.springframework.beans.factory.annotation.Value;

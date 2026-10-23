@@ -1,3 +1,4 @@
+# Rôle : construire l'image du microservice IA et définir son lancement sécurisé avec Uvicorn.
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \

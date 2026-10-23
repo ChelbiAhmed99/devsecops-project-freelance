@@ -1,3 +1,8 @@
+/**
+ * Role : fournir le composant de securite JwtService, utilise pour l authentification, les autorisations ou la gestion des acces.
+ * Contenu : definition de JwtService et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.security;
 
 import io.jsonwebtoken.Claims;

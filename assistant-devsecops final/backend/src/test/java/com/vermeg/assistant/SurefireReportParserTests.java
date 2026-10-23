@@ -1,3 +1,8 @@
+/**
+ * Role : documenter le comportement attendu en verifiant l extraction des resultats depuis les rapports Surefire.
+ * Contenu : definition de SurefireReportParserTests et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant;
 
 import com.vermeg.assistant.model.SuiteResult;

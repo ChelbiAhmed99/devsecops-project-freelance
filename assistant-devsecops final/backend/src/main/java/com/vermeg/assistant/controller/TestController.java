@@ -1,3 +1,8 @@
+/**
+ * Role : exposer les endpoints REST lies aux tests et resultats de tests et deleguer leur traitement aux services.
+ * Contenu : definition de TestController et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.controller;
 
 import com.vermeg.assistant.model.ApiDtos;

@@ -1,3 +1,8 @@
+/**
+ * Role : lancer les scans d images et recuperer leurs resultats Trivy.
+ * Contenu : definition de TrivyScanService et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import org.springframework.beans.factory.annotation.Value;

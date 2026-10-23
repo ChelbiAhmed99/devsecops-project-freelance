@@ -1,3 +1,8 @@
+/**
+ * Role : fournir le point d entree Spring Boot qui demarre le service backend.
+ * Contenu : definition de AssistantApplication et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant;
 
 import org.springframework.boot.SpringApplication;

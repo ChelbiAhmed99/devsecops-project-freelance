@@ -1,3 +1,4 @@
+# Rôle : exclure du contexte Docker les fichiers locaux, secrets et artefacts de test.
 __pycache__/
 **/__pycache__/
 .env

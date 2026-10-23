@@ -1,3 +1,8 @@
+/**
+ * Role : appeler le service IA distant et convertir ses reponses en objets exploitables.
+ * Contenu : definition de AiClient et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import com.fasterxml.jackson.databind.JsonNode;

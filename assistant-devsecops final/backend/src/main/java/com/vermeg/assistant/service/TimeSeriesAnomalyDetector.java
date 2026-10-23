@@ -1,3 +1,8 @@
+/**
+ * Role : detecter des variations anormales dans les series temporelles.
+ * Contenu : definition de TimeSeriesAnomalyDetector et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import com.vermeg.assistant.model.ApiDtos;

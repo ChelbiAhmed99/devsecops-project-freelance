@@ -1,3 +1,8 @@
+/**
+ * Role : exposer les endpoints REST lies aux journaux et deleguer leur traitement aux services.
+ * Contenu : definition de LogController et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.controller;
 
 import com.vermeg.assistant.model.AnomalyGroup;

@@ -1,4 +1,4 @@
-"""Tests de l'API HTTP (FastAPI TestClient), en mode heuristique (sans clé LLM)."""
+"""Rôle : tester les endpoints HTTP FastAPI et leur comportement en mode heuristique."""
 import pytest
 
 pytest.importorskip("fastapi")

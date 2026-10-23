@@ -1,3 +1,8 @@
+/**
+ * Role : documenter le comportement attendu en verifiant l interpretation des rapports Dependency-Check.
+ * Contenu : definition de DependencyCheckReportParserTests et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant;
 
 import com.vermeg.assistant.model.Vulnerability;

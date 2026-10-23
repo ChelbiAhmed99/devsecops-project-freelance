@@ -1,3 +1,8 @@
+/**
+ * Role : comparer des textes pour rapprocher des messages similaires.
+ * Contenu : definition de TextSimilarityUtil et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import java.util.Arrays;

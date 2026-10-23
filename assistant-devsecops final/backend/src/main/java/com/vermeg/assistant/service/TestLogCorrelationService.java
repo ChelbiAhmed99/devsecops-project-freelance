@@ -1,3 +1,8 @@
+/**
+ * Role : relier les echecs de tests aux evenements de journalisation correspondants.
+ * Contenu : definition de TestLogCorrelationService et de ses responsabilites dans le backend.
+ */
+
 package com.vermeg.assistant.service;
 
 import com.vermeg.assistant.model.CorrelatedFailure;
